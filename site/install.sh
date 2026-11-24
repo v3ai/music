@@ -9,6 +9,7 @@ curl -fsSL https://v3ai.github.io/music/apt.gpg -o /etc/apt/keyrings/v3ai-music.
 chmod 0644 /etc/apt/keyrings/v3ai-music.gpg
 echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/v3ai-music.gpg] https://github.com/v3ai/music/releases/latest/download ./" \
   > /etc/apt/sources.list.d/v3ai-music.list
-apt-get update -o Dir::Etc::sourcelist=sources.list.d/v3ai-music.list -o Dir::Etc::sourceparts=- -o APT::Get::List-Cleanup=0
+# refresh everything: music pulls in a few system libraries, and stale lists 404
+apt-get update
 apt-get install -y music
 echo "Installed. Open music from your app menu, or run: music"
