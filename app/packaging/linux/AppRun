@@ -3,7 +3,7 @@
 # desktop); the player's libmpv and everything it needs come from inside the AppImage.
 HERE="$(dirname "$(readlink -f "$0")")"
 for lib in "$HERE"/usr/lib/libmpv.so.*; do
-  export LIBMPV_LIBRARY_PATH="$lib"
+  [ -e "$lib" ] && export LIBMPV_LIBRARY_PATH="$lib"
   break
 done
 exec "$HERE/usr/share/music/music" "$@"

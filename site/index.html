@@ -47,6 +47,11 @@
   .shots .desk { width: 100%; border-radius: 12px; border: 1px solid var(--line); }
   .shots .phone { position: absolute; right: -14px; bottom: -36px; width: 23%; border-radius: 16px; border: 3px solid #222; box-shadow: 0 18px 48px rgba(0,0,0,.75); }
   .shots figcaption { color: var(--sub); font-size: 14px; margin-top: 14px; max-width: 72%; }
+  pre.cmd { position: relative; background: #141414; border: 1px solid var(--line); border-radius: 10px; padding: 14px 76px 14px 14px; margin-top: 10px; overflow-x: auto; }
+  pre.cmd code { background: none; padding: 0; font-size: 13.5px; user-select: all; white-space: pre; }
+  pre.cmd button { position: absolute; top: 9px; right: 9px; background: #262626; color: var(--fg); border: 0; border-radius: 6px; padding: 5px 10px; font: 600 12px/1.4 inherit; cursor: pointer; }
+  pre.cmd button:hover { background: #333; }
+  details h3 { font-size: 15px; margin-top: 16px; color: var(--fg); }
   footer { margin-top: 56px; color: #6e6e6e; font-size: 13px; }
   footer a { color: var(--sub); }
   @media (max-width: 520px) { .shots .phone { right: 0; bottom: -24px; border-radius: 10px; border-width: 2px; } .shots figcaption { max-width: 70%; } h1 { font-size: 44px; } main { padding-top: 48px; } .btn { width: 100%; justify-content: center; } }
@@ -116,6 +121,11 @@
   </details>
   <details id="h-linux">
     <summary>Linux</summary>
+    <h3>Ubuntu, Debian, Mint, Pop!_OS (apt)</h3>
+    <p>Paste this into a terminal. It adds the music repository and installs it, and <code>sudo apt upgrade</code> keeps it up to date from then on.</p>
+    <pre class="cmd"><code>curl -fsSL https://v3ai.github.io/music/install.sh | sudo sh</code><button type="button" data-copy>Copy</button></pre>
+    <p>You can <a href="install.sh" style="color:inherit">read the script</a> first. To remove music: <code>sudo apt remove music</code>.</p>
+    <h3>Any other distro (AppImage)</h3>
     <ol>
       <li>Download <code>music-linux-x86_64.AppImage</code>.</li>
       <li>Allow it to run: right-click it → <b>Properties</b> → <b>Allow executing as program</b> (or <code>chmod +x music-linux-x86_64.AppImage</code>).</li>
@@ -129,6 +139,13 @@
 
   <footer>Open source on <a href="https://github.com/v3ai/music">GitHub</a>. For personal use. Respect artists and the terms of the services you use.</footer>
 </main>
+<script>
+  document.querySelectorAll('[data-copy]').forEach(b => b.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(b.previousElementSibling.textContent); b.textContent = 'Copied'; }
+    catch (_) { b.textContent = 'Select & copy'; }
+    setTimeout(() => { b.textContent = 'Copy'; }, 1600);
+  }));
+</script>
 <script>
   // The big button points at the right download for this device. If the app is
   // installed, the page opens it instead: Android hands the link to the app (or

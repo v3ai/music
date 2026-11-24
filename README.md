@@ -39,6 +39,7 @@ flutter run                 # on a connected phone or this computer
 flutter build apk           # Android
 flutter build linux         # Linux (needs libgtk-3-dev, libmpv-dev)
 sh packaging/linux/build-appimage.sh   # …then pack it as an AppImage
+sh packaging/linux/build-deb.sh 1.0.0   # …and as a .deb (after the AppImage)
 flutter build windows       # Windows
 flutter build macos         # macOS
 ```
@@ -55,6 +56,7 @@ Push a tag to build every platform on GitHub Actions and publish a release. The 
 | Windows | `music-windows-setup.exe` | one-click installer, no admin needed |
 | macOS | `music-macos.dmg` | drag to Applications |
 | Linux | `music-linux-x86_64.AppImage` | one file, adds itself to the app menu on first run |
+| Linux (apt) | `curl -fsSL https://v3ai.github.io/music/install.sh \| sudo sh` | adds the apt repository, so `apt upgrade` updates it |
 
 `app/packaging/` has the installer scripts (`linux/build-appimage.sh`, `windows/music.iss`).
 
@@ -63,6 +65,8 @@ git tag v1.0.0 && git push origin v1.0.0
 ```
 
 Android builds are signed with the key in the `MUSIC_KEYSTORE_BASE64` / `MUSIC_KEYSTORE_PASSWORD` repo secrets, so updates install over older versions. Local builds read `~/.config/music-signing/key.properties`. Keep a backup of that keystore. Without it, a future update can't install over the existing app.
+
+Each release is also the apt repository (`deb https://github.com/v3ai/music/releases/latest/download ./`). Its index is signed with the key in the `APT_SIGNING_KEY` secret, whose public half is [`site/apt.gpg`](site/apt.gpg). The private key lives in `~/.config/music-signing/apt-gnupg`. Back it up too: with a new key, existing installs stop updating until they re-run the installer. After a release, the `check-apt` job installs from the repository on clean Ubuntu and Debian machines and checks that the app starts.
 
 ## Keyboard shortcuts (desktop)
 
