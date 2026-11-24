@@ -171,6 +171,7 @@ jobs:
   check-updaters:
     if: github.ref_type == 'tag'
     needs: release
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix: { os: [windows-latest, macos-latest] }
@@ -183,7 +184,9 @@ jobs:
         run: |
           Invoke-WebRequest "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:GITHUB_REF_NAME/music-windows-setup.exe" -OutFile setup.exe
           # exactly what the app runs (lib/core/updater.dart)
-          $p = Start-Process .\setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/relaunch=1' -PassThru -Wait
+          # wait for the installer only: -Wait would also wait for the music it reopens
+          $p = Start-Process .\setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/relaunch=1' -PassThru
+          if (!$p.WaitForExit(300000)) { throw "installer didn't finish in 5 minutes" }
           if ($p.ExitCode -ne 0) { throw "installer exited with $($p.ExitCode)" }
           $exe = "$env:LOCALAPPDATA\Programs\music\music.exe"
           if (!(Test-Path $exe)) { throw "music.exe wasn't installed" }
