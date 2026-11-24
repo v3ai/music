@@ -1,5 +1,8 @@
+import 'dart:io' show Platform;
+
 import 'dart:ui' as ui;
 
+import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app.dart';
@@ -189,33 +192,59 @@ class _Volume extends StatefulWidget {
 }
 
 class _VolumeState extends State<_Volume> {
-  double _before = 1;
-  @override
-  Widget build(BuildContext context) {
-    final v = App.player.audio.volume;
-    return Row(mainAxisSize: MainAxisSize.min, children: [
-      IconBtn(
-        v == 0 ? Icons.volume_off_rounded : (v < .5 ? Icons.volume_down_rounded : Icons.volume_up_rounded),
-        size: 20,
-        tooltip: v == 0 ? 'Unmute' : 'Mute',
-        onTap: () {
-          if (v > 0) {
-            _before = v;
-            App.player.setVolume(0);
-          } else {
-            App.player.setVolume(_before == 0 ? 1 : _before);
-          }
-        },
-      ),
-      SizedBox(
-        width: 110,
-        child: SliderTheme(
-          data: SliderTheme.of(context).copyWith(thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5)),
-          child: Slider(value: v.clamp(0, 1), onChanged: (x) => App.player.setVolume(x)),
-        ),
-      ),
-    ]);
+  double _before = 1; // to go back to after unmuting
+
+  void _toggleMute() {
+    final p = App.player;
+    if (p.volume > 0) {
+      _before = p.volume;
+      p.setVolume(0);
+    } else {
+      p.setVolume(_before < .05 ? .5 : _before);
+    }
   }
+
+  // mouse wheel / touchpad over the control: 5% a notch
+  void _wheel(PointerSignalEvent e) {
+    if (e is! PointerScrollEvent) return;
+    final dy = e.scrollDelta.dy != 0 ? e.scrollDelta.dy : -e.scrollDelta.dx;
+    if (dy == 0) return;
+    GestureBinding.instance.pointerSignalResolver.register(e, (_) => App.player.setVolume(App.player.volume + (dy < 0 ? .05 : -.05)));
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    onPointerSignal: _wheel,
+    child: ListenableBuilder(
+      listenable: App.player,
+      builder: (context, _) {
+        final v = App.player.volume;
+        final pct = '${(v * 100).round()}%';
+        return Row(mainAxisSize: MainAxisSize.min, children: [
+          IconBtn(
+            v == 0 ? Icons.volume_off_rounded : (v < .5 ? Icons.volume_down_rounded : Icons.volume_up_rounded),
+            size: 20,
+            tooltip: v == 0 ? 'Unmute' : 'Mute ($pct)',
+            onTap: _toggleMute,
+          ),
+          SizedBox(
+            width: 128,
+            child: Tooltip(
+              message: 'Volume $pct',
+              waitDuration: const Duration(milliseconds: 600),
+              child: SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                ),
+                child: Slider(value: v, onChanged: App.player.setVolume),
+              ),
+            ),
+          ),
+        ]);
+      },
+    ),
+  );
 }
 
 // ---------------------------------------------------------------- mobile mini player
@@ -372,7 +401,7 @@ class _NowPlayingState extends State<NowPlaying> {
         LikeButton(t, size: 28),
       ]);
 
-  Widget _bottomActions(Track t) {
+  Widget _bottomActions(Track t, {bool volume = false}) {
     final d = App.lib.download(t.id);
     return Row(children: [
       IconBtn(
@@ -396,6 +425,8 @@ class _NowPlayingState extends State<NowPlaying> {
       TabsButton(size: 24, active: _panel == 'tabs', onTap: () => setState(() => _panel = _panel == 'tabs' ? 'art' : 'tabs')),
       const SizedBox(width: 8),
       IconBtn(Icons.queue_music_rounded, size: 24, active: _panel == 'queue', dot: _panel == 'queue', tooltip: 'Queue', onTap: () => setState(() => _panel = _panel == 'queue' ? 'art' : 'queue')),
+      // computers have no volume buttons on the side
+      if (volume && !Platform.isAndroid) ...[const SizedBox(width: 8), const _Volume()],
     ]);
   }
 
@@ -471,7 +502,7 @@ class _NowPlayingState extends State<NowPlaying> {
             const SizedBox(height: 4),
             Stack(alignment: Alignment.center, children: [
               const Controls(big: true),
-              Positioned(left: 0, right: 0, child: _bottomActions(t)),
+              Positioned(left: 0, right: 0, child: _bottomActions(t, volume: true)),
             ]),
           ]),
         ),

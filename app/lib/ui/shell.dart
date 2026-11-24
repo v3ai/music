@@ -79,9 +79,9 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       final t = p.position - const Duration(seconds: 5);
       p.seek(t.isNegative ? Duration.zero : t);
     } else if (k == LogicalKeyboardKey.arrowUp && (shift || ctrl)) {
-      p.setVolume(p.audio.volume + .1);
+      p.setVolume(p.volume + .1);
     } else if (k == LogicalKeyboardKey.arrowDown && (shift || ctrl)) {
-      p.setVolume(p.audio.volume - .1);
+      p.setVolume(p.volume - .1);
     } else if (k == LogicalKeyboardKey.slash) {
       Nav.switchTab('search');
       Future.delayed(const Duration(milliseconds: 50), SearchPage.focus.requestFocus);

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
@@ -61,7 +62,8 @@ class Player extends ChangeNotifier {
 
   Future<void> init(MusicHandler h) async {
     handler = h..player = this;
-    await audio.setVolume((lib.setting<num>('volume', 1.0)).toDouble());
+    volume = lib.setting<num>('volume', 1.0).toDouble().clamp(0.0, 1.0);
+    await audio.setVolume(_gain(volume));
     audio.playerStateStream.listen((s) {
       if (s.processingState == ProcessingState.completed) _onComplete();
       notifyListeners();
@@ -219,11 +221,20 @@ class Player extends ChangeNotifier {
 
   Future<void> seek(Duration d) => audio.seek(d);
 
+  /// Where the volume slider sits, 0..1. Changes show at once; the player catches up.
+  double volume = 1;
+
   Future<void> setVolume(double v) async {
-    await audio.setVolume(v.clamp(0, 1));
-    lib.setSetting('volume', v.clamp(0, 1));
+    volume = v.clamp(0.0, 1.0);
     notifyListeners();
+    lib.setSetting('volume', volume);
+    await audio.setVolume(_gain(volume));
   }
+
+  // Slider position -> what the audio engine wants, so the slider feels the same everywhere:
+  // loudness follows position², i.e. half way is -12 dB, a quarter -24 dB. mpv (Linux,
+  // Windows) cubes its volume itself; the Android and macOS players take it as is.
+  static double _gain(double s) => (Platform.isLinux || Platform.isWindows) ? pow(s, 2 / 3).toDouble() : s * s;
 
   void toggleShuffle() {
     shuffle = !shuffle;
