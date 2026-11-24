@@ -26,7 +26,7 @@ Version: $VERSION
 Architecture: amd64
 Maintainer: v3ai <v3ai@users.noreply.github.com>
 Installed-Size: $(du -sk "$ROOT" | cut -f1)
-Depends: libgtk-3-0 | libgtk-3-0t64
+Depends: libgtk-3-0 | libgtk-3-0t64, libegl1, libgles2, libgl1
 Section: sound
 Priority: optional
 Homepage: https://v3ai.github.io/music/

@@ -144,7 +144,8 @@ jobs:
       - name: Starts and keeps running
         run: |
           S=$(command -v sudo || true)
-          $S apt-get install -y xvfb xauth >/dev/null
+          # no GPU here: Mesa's software renderer stands in for a real desktop's driver
+          $S apt-get install -y xvfb xauth libgl1-mesa-dri >/dev/null
           set +e
           timeout 20 xvfb-run -a music > out.log 2>&1
           code=$?
