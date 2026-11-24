@@ -70,6 +70,7 @@ Push a tag to build every platform on GitHub Actions and publish a release. The 
 | Windows | `music-windows-setup.exe` | one-click installer, no admin needed |
 | macOS | `music-macos.dmg` | drag to Applications |
 | Linux | `music-linux-x86_64.AppImage` | one file, adds itself to the app menu on first run |
+| macOS (Terminal) | `curl -fsSL https://v3ai.github.io/music/install-mac.sh \| sh` | installs to Applications without the “could not verify” prompt |
 | Linux (apt) | `curl -fsSL https://v3ai.github.io/music/install.sh \| sudo sh` | adds the apt repository, so `apt upgrade` updates it |
 
 `app/packaging/` has the installer scripts (`linux/build-appimage.sh`, `windows/music.iss`).

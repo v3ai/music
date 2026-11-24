@@ -162,6 +162,11 @@ jobs:
           cat app.log
           [ $code -eq 124 ] || { echo "AppImage exited early (code $code)"; exit 1; }
 
+  check-mac-install:
+    if: github.ref_type == 'tag'
+    needs: release
+    uses: ./.github/workflows/check-mac-install.yml
+
   # The in-app updater on Windows and macOS, run against the files just published.
   check-updaters:
     if: github.ref_type == 'tag'

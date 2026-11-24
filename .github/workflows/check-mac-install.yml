@@ -1,0 +1,20 @@
+# Runs the macOS one-liner from the website on a clean Mac and checks the app opens.
+# Runs after every release, or by hand from the Actions tab.
+name: Check macOS installer
+on:
+  workflow_dispatch:
+  workflow_call:
+jobs:
+  install:
+    runs-on: macos-latest
+    steps:
+      - name: Install with the one-liner from the website
+        run: |
+          curl -fsSL https://v3ai.github.io/music/install-mac.sh | sh
+          v=$(defaults read /Applications/music.app/Contents/Info.plist CFBundleShortVersionString)
+          echo "installed $v"
+          xattr -l /Applications/music.app | grep -q com.apple.quarantine && { echo "app is quarantined (would show the warning)"; exit 1; } || true
+      - name: Opens and keeps running
+        run: |
+          sleep 15
+          pgrep -x music || { echo "music isn't running"; exit 1; }

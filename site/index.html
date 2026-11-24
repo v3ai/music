@@ -115,6 +115,11 @@
   </details>
   <details id="h-macos">
     <summary>macOS</summary>
+    <h3>Terminal (no security warning)</h3>
+    <p>Paste this into Terminal. It downloads music, puts it in Applications and opens it, without the “Apple could not verify” prompt.</p>
+    <pre class="cmd"><code>curl -fsSL https://v3ai.github.io/music/install-mac.sh | sh</code><button type="button" data-copy>Copy</button></pre>
+    <p>You can <a href="install-mac.sh" style="color:inherit">read the script</a> first. Run it again any time to reinstall; music also updates itself.</p>
+    <h3>Disk image</h3>
     <ol>
       <li>Open <code>music-macos.dmg</code> and drag <b>music</b> onto <b>Applications</b>.</li>
       <li>Open music from Applications. The first time, macOS says it can’t check the app (it isn’t from the App Store): click <b>Done</b>, go to <b>System Settings → Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b>.</li>
