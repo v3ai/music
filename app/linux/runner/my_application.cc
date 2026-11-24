@@ -20,6 +20,13 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
 
+  // Already running (launched again, or opened from a link): show that window.
+  GList* windows = gtk_application_get_windows(GTK_APPLICATION(application));
+  if (windows != nullptr) {
+    gtk_window_present(GTK_WINDOW(windows->data));
+    return;
+  }
+
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
   gtk_window_set_default_size(window, 1280, 820);
@@ -70,6 +77,12 @@ static gboolean my_application_local_command_line(GApplication* application,
 
   g_autoptr(GError) error = nullptr;
   if (!g_application_register(application, nullptr, &error)) {
+    // No session bus to coordinate a single copy: just run this one.
+    g_clear_error(&error);
+    g_application_set_flags(application, G_APPLICATION_NON_UNIQUE);
+  }
+  if (!g_application_get_is_registered(application) &&
+      !g_application_register(application, nullptr, &error)) {
     g_warning("Failed to register: %s", error->message);
     *exit_status = 1;
     return TRUE;
@@ -126,5 +139,5 @@ MyApplication* my_application_new() {
 
   return MY_APPLICATION(g_object_new(my_application_get_type(),
                                      "application-id", APPLICATION_ID, "flags",
-                                     G_APPLICATION_NON_UNIQUE, nullptr));
+                                     G_APPLICATION_DEFAULT_FLAGS, nullptr));
 }

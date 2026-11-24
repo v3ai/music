@@ -21,6 +21,9 @@
   .btn { display: inline-flex; align-items: center; gap: 10px; background: var(--fg); color: #000; text-decoration: none; font-weight: 700; padding: 15px 26px; border-radius: 999px; font-size: 16px; transition: transform .1s; }
   .btn:hover { transform: scale(1.03); }
   .btn svg { width: 20px; height: 20px; }
+  .btn.ghost { background: transparent; color: var(--fg); box-shadow: inset 0 0 0 1.5px #555; }
+  .btn.ghost:hover { box-shadow: inset 0 0 0 1.5px var(--fg); }
+  [hidden] { display: none !important; }
   .note { color: var(--sub); font-size: 14px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 44px; }
   .dl { display: block; padding: 18px; border: 1px solid var(--line); border-radius: 12px; color: var(--fg); text-decoration: none; background: var(--card); transition: border-color .15s, background .15s; }
@@ -55,6 +58,7 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12m0 0-5-5m5 5 5-5M5 20h14"/></svg>
       <span id="main-label">Download</span>
     </a>
+    <a class="btn ghost" id="open-app" href="#" hidden>Open music</a>
     <span class="note" id="main-note">Free. No account, no ads.</span>
   </div>
 
@@ -114,7 +118,11 @@
   <footer>Open source on <a href="https://github.com/v3ai/music">GitHub</a>. For personal use. Respect artists and the terms of the services you use.</footer>
 </main>
 <script>
-  // Point the big button at the right download for this device.
+  // The big button points at the right download for this device. If the app is
+  // installed, the page opens it instead: Android hands the link to the app (or
+  // comes back here if it isn't installed); on computers we only try when this
+  // browser has downloaded or opened the app before, since browsers can't tell.
+  const REL = 'https://github.com/v3ai/music/releases/latest/download/';
   const ua = navigator.userAgent;
   const plats = {
     android: ['Download for Android', 'music-android.apk'],
@@ -123,20 +131,75 @@
     linux: ['Download for Linux', 'music-linux-x64.tar.gz'],
   };
   const os = /Android/i.test(ua) ? 'android'
-    : /iPhone|iPad|iPod/i.test(ua) ? 'ios'
+    : /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? 'ios'
     : /Windows/i.test(ua) ? 'windows'
     : /Mac OS X|Macintosh/i.test(ua) ? 'macos'
-    : /Linux|X11/i.test(ua) ? 'linux' : null;
+    : /Linux|X11|CrOS/i.test(ua) ? 'linux' : null;
+
+  const $ = (id) => document.getElementById(id);
+  const store = (k, v) => {
+    try {
+      if (v === undefined) return localStorage.getItem(k);
+      v === null ? localStorage.removeItem(k) : localStorage.setItem(k, v);
+    } catch (_) { return null; }
+  };
+  const once = (k) => { try { if (sessionStorage.getItem(k)) return false; sessionStorage.setItem(k, '1'); } catch (_) {} return true; };
+  const here = location.href.split('#')[0];
+  const intentUrl = 'intent://open#Intent;scheme=v3ai-music;package=io.github.v3ai.music;S.browser_fallback_url='
+    + encodeURIComponent(here + '#get') + ';end';
+  const note = $('main-note');
+  const noteText = note.textContent;
+
+  // Computers: try the link and watch for the app taking focus.
+  function openDesktop(auto) {
+    let opened = false;
+    const left = () => { opened = true; };
+    window.addEventListener('blur', left, { once: true });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) opened = true; }, { once: true });
+    note.textContent = 'Opening music…';
+    location.href = 'v3ai-music://open';
+    setTimeout(() => {
+      window.removeEventListener('blur', left);
+      if (opened) {
+        store('music.hasApp', '1');
+        note.textContent = noteText;
+      } else {
+        if (auto) store('music.hasApp', null); // not installed (any more)
+        note.textContent = auto ? noteText : 'Couldn’t open it. Is music installed?';
+      }
+    }, 2500);
+  }
+
+  function openApp(auto) {
+    if (os === 'android') location.href = intentUrl;
+    else openDesktop(auto);
+  }
+
   if (os === 'ios') {
-    document.getElementById('main-label').textContent = 'Not available on iPhone';
-    document.getElementById('main-dl').removeAttribute('href');
-    document.getElementById('main-note').textContent = 'Available for Android, Windows, macOS and Linux.';
+    $('main-label').textContent = 'Not available on iPhone';
+    $('main-dl').removeAttribute('href');
+    note.textContent = 'Available for Android, Windows, macOS and Linux.';
   } else if (os) {
     const [label, file] = plats[os];
-    document.getElementById('main-label').textContent = label;
-    document.getElementById('main-dl').href = 'https://github.com/v3ai/music/releases/latest/download/' + file;
-    const help = document.getElementById('h-' + os);
+    $('main-label').textContent = label;
+    $('main-dl').href = REL + file;
+    const help = $('h-' + os);
     if (help) help.open = true;
+
+    const open = $('open-app');
+    // on Android, #get means the app just failed to open: it isn't installed
+    open.hidden = os === 'android' && location.hash === '#get';
+    open.addEventListener('click', (e) => { e.preventDefault(); openApp(false); });
+
+    // remember downloads, so next time we can open the app straight away
+    document.querySelectorAll('a[href^="' + REL + '"], #main-dl').forEach((a) =>
+      a.addEventListener('click', () => store('music.hasApp', '1')));
+
+    const wantsDownload = location.hash === '#get' || new URLSearchParams(location.search).has('download');
+    if (!wantsDownload && once('music.tried')) {
+      if (os === 'android') openApp(true);
+      else if (store('music.hasApp') === '1') openApp(true);
+    }
   }
 </script>
 </body>

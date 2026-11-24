@@ -2,8 +2,9 @@
 Type=Application
 Name=music
 Comment=Ad-free music player
-Exec=@BIN@
+Exec=@BIN@ %u
 Icon=music
 Terminal=false
 Categories=AudioVideo;Audio;Player;
-StartupWMClass=music
+StartupWMClass=io.github.v3ai.music
+MimeType=x-scheme-handler/v3ai-music;

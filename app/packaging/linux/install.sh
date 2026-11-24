@@ -7,6 +7,9 @@ mkdir -p "$dest" "$HOME/.local/share/applications" "$HOME/.local/share/icons/hic
 cp -r "$here"/* "$dest"/
 cp "$here/music.png" "$HOME/.local/share/icons/hicolor/256x256/apps/music.png"
 sed "s|@BIN@|$dest/music|" "$here/music.desktop" > "$HOME/.local/share/applications/music.desktop"
+# let the website open the app (v3ai-music:// links)
+xdg-mime default music.desktop x-scheme-handler/v3ai-music 2>/dev/null || true
+update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 if ! ldconfig -p 2>/dev/null | grep -q libmpv.so; then
   echo "Note: music needs libmpv for audio. Install it with your package manager, e.g."
   echo "  sudo apt install libmpv2     (Debian/Ubuntu)"
