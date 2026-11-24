@@ -1,0 +1,12 @@
+{
+  "about": "YouTube clients the app asks for audio streams as, tried in order. Installed apps download this file on start, so editing it here fixes playback without a new release.",
+  "clients": [
+    {
+      "clientName": "VISIONOS",
+      "clientVersion": "1.02",
+      "clientId": 101,
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15",
+      "extra": {"deviceMake": "Apple", "deviceModel": "RealityDevice17,1", "osName": "visionOS", "osVersion": "26.5.23O471"}
+    }
+  ]
+}

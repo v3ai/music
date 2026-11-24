@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#000000">
+<title>music</title>
+<meta name="description" content="An ad-free music player for Android, Windows, macOS and Linux.">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root { --bg: #000; --fg: #fff; --sub: #a7a7a7; --line: #262626; --card: #111; }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--fg); font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+  main { max-width: 760px; margin: 0 auto; padding: 72px 20px 64px; }
+  .logo { width: 88px; height: 88px; border-radius: 20px; display: block; }
+  h1 { font-size: 56px; letter-spacing: -.04em; font-weight: 800; margin: 22px 0 8px; line-height: 1; }
+  .lead { color: var(--sub); font-size: 19px; max-width: 34em; }
+  .primary { margin: 36px 0 12px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .btn { display: inline-flex; align-items: center; gap: 10px; background: var(--fg); color: #000; text-decoration: none; font-weight: 700; padding: 15px 26px; border-radius: 999px; font-size: 16px; transition: transform .1s; }
+  .btn:hover { transform: scale(1.03); }
+  .btn svg { width: 20px; height: 20px; }
+  .note { color: var(--sub); font-size: 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 44px; }
+  .dl { display: block; padding: 18px; border: 1px solid var(--line); border-radius: 12px; color: var(--fg); text-decoration: none; background: var(--card); transition: border-color .15s, background .15s; }
+  .dl:hover { border-color: #555; background: #161616; }
+  .dl b { display: block; font-size: 16px; }
+  .dl span { color: var(--sub); font-size: 13px; }
+  h2 { font-size: 22px; margin: 56px 0 14px; letter-spacing: -.01em; }
+  ul.feat { list-style: none; padding: 0; display: grid; gap: 10px; }
+  ul.feat li { padding-left: 22px; position: relative; color: #d6d6d6; }
+  ul.feat li::before { content: ""; position: absolute; left: 0; top: .62em; width: 8px; height: 8px; border-radius: 50%; background: var(--fg); }
+  details { border-top: 1px solid var(--line); padding: 14px 0; }
+  details:last-of-type { border-bottom: 1px solid var(--line); }
+  summary { cursor: pointer; font-weight: 700; list-style: none; display: flex; justify-content: space-between; }
+  summary::after { content: "+"; color: var(--sub); font-weight: 400; }
+  details[open] summary::after { content: "–"; }
+  details p, details ol { color: var(--sub); margin-top: 10px; font-size: 15px; }
+  details ol { padding-left: 20px; }
+  code { background: #1c1c1c; padding: 2px 6px; border-radius: 4px; font-size: 13.5px; color: #e8e8e8; }
+  footer { margin-top: 56px; color: #6e6e6e; font-size: 13px; }
+  footer a { color: var(--sub); }
+  @media (max-width: 520px) { h1 { font-size: 44px; } main { padding-top: 48px; } .btn { width: 100%; justify-content: center; } }
+</style>
+</head>
+<body>
+<main>
+  <img class="logo" src="icon.svg" alt="">
+  <h1>music</h1>
+  <p class="lead">An ad-free music player for your phone and computer. Search anything, make playlists, download songs, play along with guitar tabs, and keep listening with the screen off.</p>
+
+  <div class="primary">
+    <a class="btn" id="main-dl" href="https://github.com/v3ai/music/releases/latest">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12m0 0-5-5m5 5 5-5M5 20h14"/></svg>
+      <span id="main-label">Download</span>
+    </a>
+    <span class="note" id="main-note">Free. No account, no ads.</span>
+  </div>
+
+  <div class="grid">
+    <a class="dl" href="https://github.com/v3ai/music/releases/latest/download/music-android.apk"><b>Android</b><span>.apk · Android 7+</span></a>
+    <a class="dl" href="https://github.com/v3ai/music/releases/latest/download/music-windows-x64.zip"><b>Windows</b><span>.zip · Windows 10+</span></a>
+    <a class="dl" href="https://github.com/v3ai/music/releases/latest/download/music-macos.zip"><b>macOS</b><span>.zip · macOS 12+</span></a>
+    <a class="dl" href="https://github.com/v3ai/music/releases/latest/download/music-linux-x64.tar.gz"><b>Linux</b><span>.tar.gz · x64</span></a>
+  </div>
+
+  <h2>What you get</h2>
+  <ul class="feat">
+    <li>Everything on YouTube Music: albums, artists, playlists, lyrics, with album art for every song.</li>
+    <li>Plays in the background with lock-screen, notification and headphone controls.</li>
+    <li>Guitar and bass tabs that scroll along with the song.</li>
+    <li>Download songs, albums and playlists to listen offline.</li>
+    <li>Your own playlists and Liked Songs, kept on your device.</li>
+    <li>Shuffle, repeat, queue, and endless similar songs when your music ends.</li>
+  </ul>
+
+  <h2>Installing</h2>
+  <details id="h-android">
+    <summary>Android</summary>
+    <ol>
+      <li>Download <code>music-android.apk</code> on your phone and open it.</li>
+      <li>If asked, allow your browser to install apps (“Install unknown apps”).</li>
+      <li>Tap <b>Install</b>. Later versions install over the top and keep your library.</li>
+    </ol>
+  </details>
+  <details id="h-windows">
+    <summary>Windows</summary>
+    <ol>
+      <li>Download and unzip <code>music-windows-x64.zip</code>, for example into your Documents folder.</li>
+      <li>Open <code>music.exe</code>. If Windows SmartScreen appears, click <b>More info → Run anyway</b>.</li>
+      <li>Right-click it in the taskbar and choose <b>Pin to taskbar</b>.</li>
+    </ol>
+  </details>
+  <details id="h-macos">
+    <summary>macOS</summary>
+    <ol>
+      <li>Download and open <code>music-macos.zip</code>, then drag <b>music</b> into Applications.</li>
+      <li>The first time, right-click it and choose <b>Open</b>, then <b>Open</b> again. (It isn’t signed with an Apple developer ID.)</li>
+    </ol>
+  </details>
+  <details id="h-linux">
+    <summary>Linux</summary>
+    <ol>
+      <li>Download and extract <code>music-linux-x64.tar.gz</code>.</li>
+      <li>Run <code>./music/install.sh</code> to add it to your app menu. It needs <code>libmpv</code> (on Ubuntu: <code>sudo apt install libmpv2</code>).</li>
+    </ol>
+  </details>
+  <details>
+    <summary>iPhone</summary>
+    <p>Not available. Apple only allows App Store apps, and app stores don’t allow apps like this one.</p>
+  </details>
+
+  <footer>Open source on <a href="https://github.com/v3ai/music">GitHub</a>. For personal use. Respect artists and the terms of the services you use.</footer>
+</main>
+<script>
+  // Point the big button at the right download for this device.
+  const ua = navigator.userAgent;
+  const plats = {
+    android: ['Download for Android', 'music-android.apk'],
+    windows: ['Download for Windows', 'music-windows-x64.zip'],
+    macos: ['Download for Mac', 'music-macos.zip'],
+    linux: ['Download for Linux', 'music-linux-x64.tar.gz'],
+  };
+  const os = /Android/i.test(ua) ? 'android'
+    : /iPhone|iPad|iPod/i.test(ua) ? 'ios'
+    : /Windows/i.test(ua) ? 'windows'
+    : /Mac OS X|Macintosh/i.test(ua) ? 'macos'
+    : /Linux|X11/i.test(ua) ? 'linux' : null;
+  if (os === 'ios') {
+    document.getElementById('main-label').textContent = 'Not available on iPhone';
+    document.getElementById('main-dl').removeAttribute('href');
+    document.getElementById('main-note').textContent = 'Available for Android, Windows, macOS and Linux.';
+  } else if (os) {
+    const [label, file] = plats[os];
+    document.getElementById('main-label').textContent = label;
+    document.getElementById('main-dl').href = 'https://github.com/v3ai/music/releases/latest/download/' + file;
+    const help = document.getElementById('h-' + os);
+    if (help) help.open = true;
+  }
+</script>
+</body>
+</html>

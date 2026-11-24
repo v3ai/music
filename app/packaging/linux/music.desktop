@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=music
+Comment=Ad-free music player
+Exec=@BIN@
+Icon=music
+Terminal=false
+Categories=AudioVideo;Audio;Player;
+StartupWMClass=music

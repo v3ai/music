@@ -1,11 +1,10 @@
-# Publishes the app (web/) to GitHub Pages. The Pages copy connects to your own
-# music server; see "Use it from GitHub Pages" in the README.
-name: Deploy app to GitHub Pages
+name: Pages
 
+# Publishes the download page in site/ to https://v3ai.github.io/music/
 on:
   push:
     branches: [main]
-    paths: ["web/**", ".github/workflows/pages.yml"]
+    paths: ['site/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 
 permissions:
@@ -25,22 +24,9 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-
-      # new version string on every deploy, so installed apps pick up the update
-      - name: Stamp service worker version
-        run: sed -i "s/const VERSION = 'v1';/const VERSION = '${GITHUB_SHA::10}';/" web/sw.js
-
-      # optional: the address of your music server (repo Settings → Variables → MUSIC_SERVER_URL)
-      - name: Set default server
-        env:
-          SERVER: ${{ vars.MUSIC_SERVER_URL }}
-        run: sed -i "s|const DEFAULT_SERVER = '';|const DEFAULT_SERVER = '${SERVER}';|" web/js/config.js
-
       - uses: actions/configure-pages@v5
-
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: web
-
+          path: site
       - id: deployment
         uses: actions/deploy-pages@v4
