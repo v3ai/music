@@ -2,6 +2,7 @@
 // lock-screen / notification controls via the Media Session API, and state persistence.
 
 import { api, emit, slim } from './state.js';
+import { apiUrl } from './config.js';
 import { img, artistsText, toast } from './ui.js';
 
 const STORE = 'music.player';
@@ -236,7 +237,7 @@ class Player {
     this.retried = false;
     this.playedLogged = false;
     this.audio.preload = 'auto';
-    this.audio.src = `/api/stream/${encodeURIComponent(t.id)}`;
+    this.audio.src = apiUrl(`/stream/${encodeURIComponent(t.id)}`);
     this._resumeAt = 0;
     if (autoplay) this.play();
     this._mediaSession();
@@ -248,7 +249,7 @@ class Player {
 
   _prefetch() {
     const n = this.queue[this.index + 1];
-    if (n) navigator.onLine && fetch(`/api/prefetch/${encodeURIComponent(n.id)}`, { method: 'POST' }).catch(() => {});
+    if (n) navigator.onLine && fetch(apiUrl(`/prefetch/${encodeURIComponent(n.id)}`), { method: 'POST' }).catch(() => {});
   }
 
   _wire() {
@@ -278,7 +279,7 @@ class Player {
       if (!this.retried && navigator.onLine) {
         this.retried = true;
         const pos = a.currentTime;
-        a.src = `/api/stream/${encodeURIComponent(this.current.id)}?r=${Date.now()}`;
+        a.src = apiUrl(`/stream/${encodeURIComponent(this.current.id)}?r=${Date.now()}`);
         this._resumeAt = pos;
         this.play();
         return;
@@ -299,6 +300,12 @@ class Player {
     }
   }
 
+  /** Re-publish lock-screen metadata (e.g. after better album art was found). */
+  refreshMeta() {
+    this._mediaSession();
+    this._save();
+  }
+
   _ms(state) {
     if ('mediaSession' in navigator) navigator.mediaSession.playbackState = state;
   }
@@ -311,7 +318,7 @@ class Player {
       title: t.title,
       artist: artistsText(t),
       album: t.album?.name || '',
-      artwork: t.art ? sizes.map((s) => ({ src: img(t.art, s / Math.min(devicePixelRatio || 1, 2)), sizes: `${s}x${s}`, type: 'image/jpeg' })) : [],
+      artwork: t.art ? sizes.map((s) => ({ src: new URL(img(t.art, s / Math.min(devicePixelRatio || 1, 2)), location.href).href, sizes: `${s}x${s}`, type: 'image/jpeg' })) : [],
     });
   }
 
@@ -355,7 +362,7 @@ class Player {
       if (typeof s.volume === 'number') this.audio.volume = s.volume;
       if (this.current) {
         this.audio.preload = 'none';
-        this.audio.src = `/api/stream/${encodeURIComponent(this.current.id)}`;
+        this.audio.src = apiUrl(`/stream/${encodeURIComponent(this.current.id)}`);
         this._resumeAt = s.time || 0;
         this._mediaSession();
       }

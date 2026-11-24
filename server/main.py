@@ -1,16 +1,19 @@
 import asyncio
-import re
 import contextlib
 import hashlib
+import re
+from urllib.parse import urlsplit
 
 import httpx
 from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.background import BackgroundTask
 
 from . import db, media, ytm
-from .config import WEB_DIR
+from .config import ALLOWED_ORIGINS, DATA_DIR, WEB_DIR
 
 http: httpx.AsyncClient | None = None
 
@@ -27,6 +30,18 @@ async def lifespan(app):
 
 app = FastAPI(title="music", lifespan=lifespan, docs_url=None, redoc_url=None)
 
+# Let the GitHub Pages copy of the app talk to this server (including Chrome's
+# "private network access" check: a public site reaching a server on your network).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    allow_private_network=True,
+    expose_headers=["Content-Range", "Content-Length", "Accept-Ranges"],
+    max_age=86400,
+)
+
 
 async def run(fn, *args):
     try:
@@ -37,8 +52,24 @@ async def run(fn, *args):
         raise HTTPException(502, f"{type(e).__name__}: {e}"[:300])
 
 
+def _apply_art(tracks):
+    """Swap video frames for album art we've already found."""
+    vids = [t["id"] for t in tracks if ytm.is_video_art(t.get("art"))]
+    if not vids:
+        return tracks
+    found = db.art_lookup(vids)
+    for t in tracks:
+        f = found.get(t["id"])
+        if f:
+            t["art"] = f["art"]
+            if not t.get("album") and f.get("album"):
+                t["album"] = f["album"]
+    return tracks
+
+
 def _with_state(tracks):
-    """Annotate tracks with liked / downloaded flags."""
+    """Annotate tracks with liked / downloaded flags (and album art for videos)."""
+    _apply_art(tracks)
     liked = set(db.liked_ids())
     dls = db.download_states()
     for t in tracks:
@@ -55,6 +86,8 @@ async def home():
         shelves = await run(ytm.home)
     except HTTPException:
         shelves = []
+    for sh in shelves:
+        _apply_art([i for i in sh["items"] if i.get("kind") == "track"])
     return {
         "recent": _with_state(db.recent_tracks(20)),
         "playlists": db.list_playlists()[:8],
@@ -67,6 +100,9 @@ async def home():
 async def search(q: str):
     r = await run(ytm.search, q.strip())
     _with_state(r["songs"])
+    _with_state(r["videos"])
+    if r["top"] and r["top"]["kind"] == "track":
+        _apply_art([r["top"]])
     return r
 
 
@@ -92,6 +128,7 @@ async def album(bid: str):
 async def artist(cid: str):
     a = dict(await run(ytm.artist, cid))
     a["songs"] = _with_state([dict(t) for t in a["songs"]])
+    a["videos"] = _with_state([dict(t) for t in a["videos"]])
     a["saved"] = db.is_saved("artist", cid)
     return a
 
@@ -121,6 +158,90 @@ async def radio(vid: str):
 @app.get("/api/lyrics/{vid}")
 async def lyrics(vid: str):
     return await run(ytm.lyrics, vid)
+
+
+# ---------- artwork proxy + disk cache ----------
+# Browsers loading a page full of covers straight from Google get rate-limited (429),
+# leaving blank artwork. Instead the app loads covers from here: we fetch each image
+# once (a few at a time, retrying politely), keep it on disk, and serve it forever.
+
+ART_HOSTS = ("googleusercontent.com", "ggpht.com", "ytimg.com")
+ART_DIR = DATA_DIR / "art"
+_img_sem = asyncio.Semaphore(6)
+_img_headers = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0 Safari/537.36"}
+IMG_CACHE = {"Cache-Control": "public, max-age=31536000, immutable"}
+
+
+def _img_type(b: bytes):
+    if b[:3] == b"\xff\xd8\xff":
+        return "image/jpeg"
+    if b[:8] == b"\x89PNG\r\n\x1a\n":
+        return "image/png"
+    if b[:4] == b"RIFF" and b[8:12] == b"WEBP":
+        return "image/webp"
+    if b[:4] in (b"GIF8",):
+        return "image/gif"
+    return None
+
+
+async def _fetch_img(url):
+    for attempt in range(5):
+        try:
+            r = await http.get(url, headers=_img_headers)
+        except httpx.HTTPError:
+            r = None
+        if r is not None and r.status_code == 200 and _img_type(r.content):
+            return r.content
+        if r is not None and r.status_code == 404:
+            return None
+        await asyncio.sleep(0.4 * 2 ** attempt)
+    return None
+
+
+@app.get("/api/img")
+async def image(u: str):
+    host = urlsplit(u).hostname or ""
+    if urlsplit(u).scheme != "https" or not host.endswith(ART_HOSTS):
+        raise HTTPException(400, "not an artwork url")
+    key = hashlib.sha1(u.encode()).hexdigest()
+    path = ART_DIR / key[:2] / key
+    if not path.exists():
+        async with _img_sem:
+            if not path.exists():
+                data = await _fetch_img(u)
+                if data is None:
+                    # video frames: hq720 doesn't exist for every video; mqdefault always does
+                    m = re.search(r"i\.ytimg\.com/vi/([\w-]{11})/(?!mqdefault)", u)
+                    if m:
+                        data = await _fetch_img(f"https://i.ytimg.com/vi/{m.group(1)}/mqdefault.jpg")
+                if data is None:
+                    raise HTTPException(404, "artwork not found")
+                path.parent.mkdir(parents=True, exist_ok=True)
+                tmp = path.with_suffix(".tmp")
+                tmp.write_bytes(data)
+                tmp.replace(path)
+    data = path.read_bytes()
+    return Response(data, media_type=_img_type(data) or "image/jpeg", headers=IMG_CACHE)
+
+
+@app.post("/api/art")
+async def find_art(body: dict = Body(...)):
+    """Album art for video tracks: {tracks:[{id,title,artists}]} -> {id: {art, album} | null}."""
+    tracks = [t for t in (body.get("tracks") or [])[:40] if isinstance(t, dict) and t.get("id")]
+    known = db.art_lookup([t["id"] for t in tracks])
+    out = {tid: v for tid, v in known.items()}
+    todo = [t for t in tracks if t["id"] not in known]
+
+    async def one(t):
+        try:
+            found = await asyncio.to_thread(ytm.match_song, t.get("title") or "", t.get("artists") or [])
+        except Exception:
+            return  # network hiccup: don't cache, try again later
+        db.art_store(t["id"], found)
+        out[t["id"]] = {"art": found["art"], "album": found.get("album")} if found else None
+
+    await asyncio.gather(*(one(t) for t in todo))
+    return out
 
 
 # ---------- playback ----------
@@ -240,7 +361,7 @@ TRACK_KEYS = ("id", "title", "artists", "album", "duration", "art", "explicit")
 def _clean(t):
     if not isinstance(t, dict) or not t.get("id"):
         raise HTTPException(400, "track required")
-    return {k: t.get(k) for k in TRACK_KEYS}
+    return _apply_art([{k: t.get(k) for k in TRACK_KEYS}])[0]
 
 
 @app.get("/api/library")
@@ -382,7 +503,7 @@ async def not_found(request: Request, exc):
     if request.url.path.startswith("/api/"):
         detail = getattr(exc, "detail", "Not found")
         return JSONResponse({"detail": detail}, status_code=404)
-    return FileResponse(WEB_DIR / "index.html")
+    return RedirectResponse("/")
 
 
 class NoCacheStatic(StaticFiles):

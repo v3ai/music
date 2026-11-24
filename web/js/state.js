@@ -1,9 +1,12 @@
+import { img } from './ui.js';
+import { apiUrl } from './config.js';
+
 // API client + library state (likes, playlists, saved items, downloads) + on-device offline audio.
 
 const mem = new Map();
 
 async function req(method, path, body) {
-  const r = await fetch('/api' + path, {
+  const r = await fetch(apiUrl(path), {
     method,
     headers: body ? { 'content-type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,
@@ -177,14 +180,15 @@ async function saveToDevice(id) {
   wantDevice.delete(id);
   if (!('caches' in window)) return;
   try {
-    const url = `/api/stream/${id}`;
-    const r = await fetch(url, { cache: 'no-store' });
+    const url = `/api/stream/${id}`; // cache key the service worker looks up
+    const r = await fetch(apiUrl(`/stream/${id}`), { cache: 'no-store' });
     if (!r.ok) throw new Error(r.status);
     const blob = await r.blob();
     const c = await caches.open(AUDIO_CACHE);
     await c.put(url, new Response(blob, { headers: { 'content-type': blob.type || 'audio/mp4', 'content-length': String(blob.size) } }));
     const meta = pendingMeta.get(id) || { id };
-    if (meta.art) fetch(meta.art, { mode: 'no-cors' }).catch(() => {});
+    // warm the artwork cache so covers show offline (the service worker keeps a copy)
+    if (meta.art) for (const px of [48, 300, 720]) fetch(img(meta.art, px), { mode: 'no-cors' }).catch(() => {});
     device.set(id, meta);
     pendingMeta.delete(id);
     persistDevice();

@@ -19,6 +19,10 @@ DOWNLOAD_DIR = Path(os.environ.get("MUSIC_DOWNLOADS", DATA_DIR / "downloads")).e
 WEB_DIR = ROOT / "web"
 HOST = os.environ.get("MUSIC_HOST", "0.0.0.0")
 PORT = int(os.environ.get("MUSIC_PORT", "8484"))
+# Web origins (besides this server itself) allowed to use the API, e.g. the GitHub Pages copy
+# of the app. Comma-separated.
+ALLOWED_ORIGINS = [o.strip().rstrip("/") for o in os.environ.get(
+    "MUSIC_ALLOWED_ORIGINS", "https://v3ai.github.io").split(",") if o.strip()]
 # Optional: YouTube Music UI language / region for search & home
 LANG = os.environ.get("MUSIC_LANG", "en")
 REGION = os.environ.get("MUSIC_REGION") or None

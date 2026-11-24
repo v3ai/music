@@ -1,4 +1,5 @@
 // Shared UI helpers: icons, formatting, components, menus, sheets, toasts, dialogs.
+import { apiUrl } from './config.js';
 
 const S = (body, { fill = false, w = 2 } = {}) =>
   `<svg viewBox="0 0 24 24" aria-hidden="true" ${fill ? 'fill="currentColor" stroke="none"' : `fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round"`}>${body}</svg>`;
@@ -47,6 +48,7 @@ export const icon = {
   save: S('<circle cx="12" cy="12" r="9.5"/><path d="M12 8v8M8 12h8"/>', { w: 1.8 }),
   saved: `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10.5" fill="currentColor"/><path d="m7.5 12.3 3 3 6-6.3" fill="none" style="stroke:var(--bg)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   arrowDown: S('<path d="M12 4v15M6 13l6 6 6-6"/>', { w: 2.2 }),
+  settings: S('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>', { w: 1.8 }),
   phone: S('<rect x="6" y="2.5" width="12" height="19" rx="2.5"/><path d="M11 18h2"/>'),
   bars: `<span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>`,
 };
@@ -69,20 +71,34 @@ export function fmtLong(s) {
 
 const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
+// when an image can't be loaded at all, show a neutral placeholder
+window.artFail = (el) => {
+  el.onerror = null;
+  el.src = window.ART_PH;
+};
+
 // shown when album art fails to load
 window.ART_PH = 'data:image/svg+xml,' + encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect width="24" height="24" fill="#242424"/>' +
   '<g fill="none" stroke="#6f6f6f" stroke-width=".8" stroke-linecap="round" stroke-linejoin="round" transform="translate(6 6) scale(.5)">' +
   '<path d="M9 18V5.5l11-2V16"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></g></svg>');
 
-/** Resize Google image URLs to the size we actually display. */
+const SIZES = [96, 160, 240, 360, 544, 800, 1200];
+
+/**
+ * Artwork URL at (at least) the size we display. Images are loaded through the music
+ * server, which caches them on disk — loading dozens of covers straight from Google
+ * gets rate-limited and leaves blank squares. Sizes snap to a few steps so each cover
+ * is fetched in as few variants as possible.
+ */
 export function img(url, px = 120) {
   if (!url) return '';
-  const n = Math.round(px * dpr);
+  if (url.startsWith('data:') || url.startsWith('/api/')) return url;
+  const n = SIZES.find((s) => s >= px * dpr) || 1200;
   if (/googleusercontent\.com|ggpht\.com/.test(url)) {
-    return url.replace(/=[ws]\d+[^/=]*$/, '') + `=w${n}-h${n}-l90-rj`;
+    url = url.replace(/=[ws]\d+[^/=]*$/, '') + `=w${n}-h${n}-l90-rj`;
   }
-  return url;
+  return apiUrl(`/img?u=${encodeURIComponent(url)}`);
 }
 
 export const artistsText = (t) => (t.artists || []).map((a) => a.name).join(', ');
@@ -97,7 +113,7 @@ export function artistLinks(t) {
 
 export function art(url, px, cls = '', round = false) {
   return url
-    ? `<img class="art ${cls}${round ? ' round' : ''}" src="${esc(img(url, px))}" loading="lazy" decoding="async" alt="" onerror="this.onerror=null;this.src=window.ART_PH">`
+    ? `<img class="art ${cls}${round ? ' round' : ''}" src="${esc(img(url, px))}" loading="lazy" decoding="async" alt="" onerror="artFail(this)">`
     : `<div class="art ph ${cls}${round ? ' round' : ''}">${icon.note}</div>`;
 }
 
@@ -112,6 +128,9 @@ export function reg(tracks, meta = {}) {
   return key;
 }
 export const getList = (k) => lists.get(k);
+export function* allTracks() {
+  for (const l of lists.values()) yield* l.tracks;
+}
 
 // ---------- components ----------
 
@@ -121,9 +140,9 @@ export const getList = (k) => lists.get(k);
 export function trackRow(t, i, key, opts = {}, state = {}) {
   const playing = state.currentId === t.id;
   const dl = state.dl?.(t.id);
-  const lead = opts.num
-    ? `<div class="tr-num">${playing ? icon.bars : `<span>${i + 1}</span>`}<button class="tr-numplay" tabindex="-1">${icon.play}</button></div>`
-    : `<div class="tr-art">${art(t.art, 48)}${playing ? `<div class="tr-art-eq">${icon.bars}</div>` : ''}</div>`;
+  const numHtml = `<div class="tr-num">${playing ? icon.bars : `<span>${i + 1}</span>`}<button class="tr-numplay" tabindex="-1">${icon.play}</button></div>`;
+  const artHtml = `<div class="tr-art">${art(t.art, 48)}${playing && !opts.num ? `<div class="tr-art-eq">${icon.bars}</div>` : ''}</div>`;
+  const lead = opts.num ? numHtml + (opts.art ? artHtml : '') : artHtml;
   const sig = `${playing}|${!!state.liked?.(t.id)}|${dl || (state.device?.(t.id) ? 'done' : '')}`;
   return `<div class="tr${playing ? ' playing' : ''}" data-list="${key}" data-i="${i}" data-id="${esc(t.id)}" data-sig="${sig}" role="button" tabindex="0">
     ${lead}

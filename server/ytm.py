@@ -71,7 +71,7 @@ def art_url(thumbs, size=544):
         return url + f"=w{size}-h{size}-l90-rj"
     m = re.search(r"i\.ytimg\.com/vi/([\w-]{11})/", url)
     if m:
-        return f"https://i.ytimg.com/vi/{m.group(1)}/hqdefault.jpg"
+        return f"https://i.ytimg.com/vi/{m.group(1)}/hq720.jpg"
     return url
 
 
@@ -338,3 +338,55 @@ def lyrics(video_id):
     except Exception:
         return None
     return {"text": l.get("lyrics"), "source": l.get("source")} if l else None
+
+
+# ---------- album art for videos ----------
+# Music videos / uploads have no album, only a video frame. Find the matching album
+# song on YouTube Music and borrow its album + cover art.
+
+_NOISE = re.compile(
+    r"\s*[\(\[][^\)\]]*(official|video|lyric|audio|visuali[sz]er|\bhd\b|\b4k\b|\bhq\b|\bmv\b|clip|"
+    r"remaster|explicit|clean|performance|color coded|letra|legendado)[^\)\]]*[\)\]]",
+    re.I,
+)
+_FEAT = re.compile(r"\s+[\(\[]?(ft|feat|featuring)\.?\s.*$", re.I)
+
+
+def _norm(s):
+    return re.sub(r"[^\w]+", "", (s or "").lower())
+
+
+def _clean_title(t):
+    t = _NOISE.sub("", t or "")
+    t = _FEAT.sub("", t)
+    return t.strip(" -|–—\"'")
+
+
+def is_video_art(url):
+    return not url or "i.ytimg.com" in url
+
+
+def match_song(title, artists):
+    """Return {art, album, song} for the album version of a video, or None."""
+    names = [a["name"] for a in artists or [] if a.get("name")]
+    t = _clean_title(title)
+    for sep in (" - ", " – ", " — ", " | "):
+        if sep in t:
+            left, right = t.split(sep, 1)
+            if not names or any(_norm(n) in _norm(left) or _norm(left) in _norm(n) for n in names):
+                names = names or [left.strip()]
+                t = _clean_title(right)
+            break
+    if not t:
+        return None
+    nt = _norm(t)
+    who = _norm(" ".join(names))
+    for song in search_songs(f"{names[0] if names else ''} {t}".strip())[:6]:
+        st = _norm(_clean_title(song["title"]))
+        title_ok = st == nt or (min(len(st), len(nt)) >= 4 and (st.startswith(nt) or nt.startswith(st))
+                                and min(len(st), len(nt)) / max(len(st), len(nt)) > 0.6)
+        song_artists = [_norm(a["name"]) for a in song["artists"]]
+        artist_ok = not who or any(a and (a in who or who in a) for a in song_artists)
+        if title_ok and artist_ok and song.get("art"):
+            return {"art": song["art"], "album": song.get("album"), "song": song["id"]}
+    return None

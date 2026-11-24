@@ -1,0 +1,40 @@
+# Publishes the app (web/) to GitHub Pages. The Pages copy connects to your own
+# music server; see "Use it from GitHub Pages" in the README.
+name: Deploy app to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # new version string on every deploy, so installed apps pick up the update
+      - name: Stamp service worker version
+        run: sed -i "s/const VERSION = 'v1';/const VERSION = '${GITHUB_SHA::10}';/" web/sw.js
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

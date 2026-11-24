@@ -51,6 +51,12 @@ CREATE TABLE IF NOT EXISTS history (
     played_at REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS history_time ON history(played_at);
+CREATE TABLE IF NOT EXISTS art_cache (
+    video_id TEXT PRIMARY KEY,
+    art TEXT,                      -- NULL = no album version found
+    album TEXT,
+    checked_at REAL NOT NULL
+);
 CREATE TABLE IF NOT EXISTS saved (
     kind TEXT NOT NULL,            -- album | artist | playlist (remote YT Music)
     id TEXT NOT NULL,
@@ -263,3 +269,28 @@ def recent_tracks(limit=30):
     rows = _q("""SELECT track_id, MAX(played_at) p FROM history GROUP BY track_id
                  ORDER BY p DESC LIMIT ?""", (limit,))
     return _tracks_from_rows(rows)
+
+
+# ---------- album art found for videos ----------
+
+def art_lookup(ids):
+    """{video_id: {"art", "album"} | None} for ids we've already checked."""
+    if not ids:
+        return {}
+    out = {}
+    ids = list(ids)
+    for i in range(0, len(ids), 500):
+        chunk = ids[i:i + 500]
+        rows = _q(f"SELECT * FROM art_cache WHERE video_id IN ({','.join('?' * len(chunk))})", chunk)
+        for r in rows:
+            # retry misses after a week
+            if r["art"] is None and time.time() - r["checked_at"] > 7 * 86400:
+                continue
+            out[r["video_id"]] = {"art": r["art"], "album": json.loads(r["album"]) if r["album"] else None} if r["art"] else None
+    return out
+
+
+def art_store(video_id, found):
+    _x("INSERT INTO art_cache(video_id, art, album, checked_at) VALUES(?,?,?,?) "
+       "ON CONFLICT(video_id) DO UPDATE SET art=excluded.art, album=excluded.album, checked_at=excluded.checked_at",
+       (video_id, (found or {}).get("art"), json.dumps(found["album"]) if found and found.get("album") else None, time.time()))

@@ -2,8 +2,10 @@ import { api, lib, on, loadLibrary, isLiked, dlState, onDevice, toggleLike, down
 import { player } from './player.js';
 import {
   icon, esc, art, img, fmtTime, artistLinks, artistsText, getList, reg, trackRow, toast, openMenu, closeMenu, isMobile, mosaic,
+  allTracks,
 } from './ui.js';
 import * as views from './views.js';
+import { needsServer } from './config.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
@@ -101,6 +103,7 @@ const routes = [
   [/^#\/artist\/([^/?]+)/, (el, m) => views.artist(el, { id: decodeURIComponent(m[1]) })],
   [/^#\/yt\/([^/?]+)/, (el, m) => views.ytPlaylist(el, { id: decodeURIComponent(m[1]) })],
   [/^#\/playlist\/([^/?]+)/, (el, m) => views.localPlaylist(el, { id: decodeURIComponent(m[1]) })],
+  [/^#\/settings$/, views.settings, 'library'],
 ];
 
 let handlers = {};
@@ -109,6 +112,10 @@ const scrollPos = new Map();
 let lastHash = location.hash;
 
 async function route() {
+  if (needsServer) {
+    document.body.classList.add('connecting');
+    return views.connect(view);
+  }
   const hash = location.hash || '#/';
   const my = ++routeSeq;
   scrollPos.set(lastHash, main.scrollTop);
@@ -565,9 +572,73 @@ function refreshRows() {
   }
 }
 
+// ---------- album art for videos ----------
+// Videos only come with a video frame. Ask the server to find the album version's
+// cover, then swap it in everywhere that song appears (lists, player, lock screen).
+
+const artChecked = new Set();
+let artTimer = null;
+const isVideoArt = (u) => !u || u.includes('i.ytimg.com');
+
+function scheduleArt() {
+  clearTimeout(artTimer);
+  artTimer = setTimeout(upgradeArt, 120);
+}
+
+async function upgradeArt() {
+  if (!navigator.onLine) return;
+  const want = new Map();
+  const consider = (t) => {
+    if (t && isVideoArt(t.art) && !artChecked.has(t.id) && !want.has(t.id)) want.set(t.id, t);
+  };
+  for (const el of document.querySelectorAll('#view [data-id], #queue-body [data-id]')) {
+    const list = getList(el.dataset.list);
+    consider(list?.tracks[+el.dataset.i]);
+  }
+  consider(player.current);
+  player.queue.slice(player.index, player.index + 3).forEach(consider);
+  if (!want.size) return;
+  const batch = [...want.values()].slice(0, 40);
+  batch.forEach((t) => artChecked.add(t.id));
+  let found;
+  try {
+    found = await api.post('/art', { tracks: batch.map((t) => ({ id: t.id, title: t.title, artists: t.artists })) });
+  } catch {
+    batch.forEach((t) => artChecked.delete(t.id));
+    return;
+  }
+  const hits = Object.entries(found).filter(([, v]) => v?.art);
+  if (!hits.length) return;
+  const byId = new Map(hits);
+  const patch = (t) => {
+    const f = t && byId.get(t.id);
+    if (!f) return false;
+    t.art = f.art;
+    if (!t.album && f.album) t.album = f.album;
+    return true;
+  };
+  for (const t of allTracks()) patch(t);
+  let currentChanged = false;
+  player.queue.forEach((t, i) => { if (patch(t) && i === player.index) currentChanged = true; });
+  for (const [id, f] of hits) {
+    for (const el of document.querySelectorAll(`[data-id="${CSS.escape(id)}"] img.art`)) {
+      const px = Math.max(48, el.clientWidth || 48);
+      el.src = img(f.art, px);
+    }
+  }
+  if (currentChanged) {
+    renderTrackInfo();
+    player.refreshMeta();
+  }
+  if (want.size > batch.length) scheduleArt();
+}
+
+new MutationObserver(scheduleArt).observe($('#view'), { childList: true, subtree: true });
+new MutationObserver(scheduleArt).observe($('#queue-body'), { childList: true, subtree: true });
+
 // ---------- events ----------
 
-on('track', () => { renderTrackInfo(); renderTime(); refreshRows(); renderQueue(); });
+on('track', () => { renderTrackInfo(); renderTime(); refreshRows(); renderQueue(); scheduleArt(); });
 on('state', () => { renderState(); refreshRows(); });
 on('time', renderTime);
 on('mode', () => { renderMode(); renderQueue(); });
@@ -598,12 +669,12 @@ renderMode();
 renderTime();
 renderVolume();
 renderSidebar();
-loadLibrary();
+if (!needsServer) loadLibrary();
 route();
 
 if ('serviceWorker' in navigator) {
   const hadController = !!navigator.serviceWorker.controller;
-  navigator.serviceWorker.register('/sw.js').catch((e) => console.warn('SW failed', e));
+  navigator.serviceWorker.register('sw.js').catch((e) => console.warn('SW failed', e));
   // a new version was installed: reload into it, but never interrupt playback
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hadController) return;

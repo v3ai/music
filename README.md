@@ -17,6 +17,7 @@ It looks and feels like a normal streaming app: home feed, search, albums, artis
 - **No ads, no account.** Nothing is sent to Google except anonymous search/stream requests.
 - **Fast.** No build step or framework. The app shell is cached by a service worker, so it opens instantly. The next song in the queue is resolved ahead of time, so skipping is near-instant.
 - **Plays in the background.** It uses a real `<audio>` element plus the Media Session API. On iOS and Android you get lock-screen and notification controls, artwork, and next/previous, and music keeps playing with the screen off or while you use other apps.
+- **Album art everywhere.** Covers load through your server, which keeps a copy on disk, so they show up instantly and never hit Google's rate limits. Music videos get their album's cover: the server finds the matching album song on YouTube Music.
 - **Downloads** go two places. The server saves them to `data/downloads/Artist/Artist - Title [id].m4a` with tags and embedded art. On a phone or other remote device they're also stored in the browser, so they play with no connection.
 
 ## Run it
@@ -52,6 +53,7 @@ Settings (environment variables):
 | `MUSIC_DATA` | `./data` | library database and caches |
 | `MUSIC_DOWNLOADS` | `./data/downloads` | where downloaded songs go, e.g. `~/Music` |
 | `MUSIC_LANG` / `MUSIC_REGION` | `en` / auto | language and country for search and the home feed |
+| `MUSIC_ALLOWED_ORIGINS` | `https://v3ai.github.io` | other sites allowed to use this server, e.g. the GitHub Pages copy of the app |
 
 ## Install as an app
 
@@ -63,6 +65,16 @@ Settings (environment variables):
 - **Recommended (anywhere, with HTTPS):** install [Tailscale](https://tailscale.com) on the computer and phone, then run `tailscale serve --bg 8484` on the computer. Open the `https://<computer>.<tailnet>.ts.net` URL on your phone and add it to your home screen. HTTPS turns on the full app experience: offline downloads on the phone, the install prompt on Android, and instant start-up. It also works away from home.
 
 > Browsers only allow offline storage (service workers) on HTTPS or `localhost`. Over plain `http://192.168…` everything works, including background playback, except saving songs onto the phone itself.
+
+## Use it from GitHub Pages
+
+The app is also published at **https://v3ai.github.io/music/** on every push to `main` (see `.github/workflows/pages.yml`). Pages only hosts the app itself. It still plays through your own server, so:
+
+1. Run the server (`./music` or `./music service`) and give it an HTTPS address with Tailscale: `tailscale serve --bg 8484`. Browsers block plain `http://` servers from HTTPS pages.
+2. Open https://v3ai.github.io/music/ and enter that address (e.g. `https://my-computer.tailnet.ts.net`). You can change it later in **Settings** (the gear in Your Library).
+3. If your browser asks to let the site access devices on your local network, choose **Allow**.
+
+You can install it to your home screen or desktop from there, like any other app.
 
 ## Keyboard shortcuts (desktop)
 
@@ -87,8 +99,9 @@ server/            Python (FastAPI)
   ytm.py           YouTube Music metadata, normalized
   media.py         yt-dlp stream resolving, download worker
   db.py            SQLite library
-web/               the app (plain ES modules, no build step)
+web/               the app (plain ES modules, no build step) — also deployed to GitHub Pages
   index.html  css/app.css  sw.js  manifest.webmanifest
+  js/config.js     which server to talk to (same origin, or the one entered on GitHub Pages)
   js/main.js       router, player UI, now playing, queue
   js/views.js      pages: home, search, album, artist, playlists, library
   js/player.js     playback engine, queue, media session

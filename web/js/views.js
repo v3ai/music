@@ -3,8 +3,9 @@
 
 import { api, lib, device, isSaved, toggleSave, download, removeDownload, createPlaylist, refreshPlaylists, slim, emit } from './state.js';
 import { player } from './player.js';
+import { BASE, ON_PAGES, setServer } from './config.js';
 import {
-  icon, esc, art, mosaic, card, shelf, reg, trackRow, skeleton, errorView, fmtLong, fmtTime,
+  icon, esc, art, img, mosaic, card, shelf, reg, trackRow, skeleton, errorView, fmtLong, fmtTime,
   artistLinks, artistsText, toast, prompt, confirmDialog, openMenu,
 } from './ui.js';
 import { rowState, trackMenuItems, addToPlaylistItems, setTitle } from './main.js';
@@ -266,12 +267,12 @@ export async function artist(el, { id }) {
   try { a = await api.get(`/artist/${encodeURIComponent(id)}`, TTL); } catch (e) { el.innerHTML = errorView(e); return; }
   setTitle(a.name);
   const context = { label: a.name, href: `#/artist/${id}` };
-  const key = reg(a.songs, { opts: { noArtist: true, album: true }, context });
+  const key = reg(a.songs, { opts: { num: true, art: true, noArtist: true }, context });
   const saved = isSaved('artist', id);
   const st = rowState();
   el.innerHTML = `<div class="page detail artist-page">
     <header class="artist-hero">
-      ${a.art ? `<img class="artist-bg" src="${esc(a.art)}" alt="" decoding="async">` : ''}
+      ${a.art ? `<img class="artist-bg" src="${esc(img(a.art, 1200))}" alt="" decoding="async" onerror="this.remove()">` : ''}
       <div class="artist-hero-info">
         <h1 class="artist-name">${esc(a.name)}</h1>
         ${a.listeners ? `<div class="hero-meta">${esc(a.listeners)} ${/listener|subscriber/i.test(a.listeners) ? '' : 'monthly listeners'}</div>` : ''}
@@ -284,7 +285,7 @@ export async function artist(el, { id }) {
       <button class="icon-btn" data-act="radio" aria-label="Artist radio">${icon.radio}</button>
     </div>
     ${a.songs.length ? `<section><h2 class="section-title">Popular</h2>
-      <div class="tracks numbered popular">${a.songs.slice(0, 10).map((t, i) => trackRow(t, i, key, { num: true, noArtist: true }, st).replace('class="tr', `class="tr${i >= 5 ? ' extra' : ''}`)).join('')}</div>
+      <div class="tracks numbered with-art popular">${a.songs.slice(0, 10).map((t, i) => trackRow(t, i, key, { num: true, art: true, noArtist: true }, st).replace('class="tr', `class="tr${i >= 5 ? ' extra' : ''}`)).join('')}</div>
       ${a.songs.length > 5 ? `<button class="link-btn" data-act="toggleMore">See more</button>` : ''}
     </section>` : ''}
     ${shelf('Albums', a.albums)}
@@ -466,7 +467,7 @@ export async function library(el) {
       }
     }
     el.innerHTML = `<div class="page library-page">
-      <div class="lib-head"><h1>Your Library</h1><button class="icon-btn" data-act="create" aria-label="Create playlist">${icon.plus}</button></div>
+      <div class="lib-head"><h1>Your Library</h1><div class="lib-head-btns"><a class="icon-btn" href="#/settings" aria-label="Settings">${icon.settings}</a><button class="icon-btn" data-act="create" aria-label="Create playlist">${icon.plus}</button></div></div>
       <div class="chips">${['all', 'playlists', 'albums', 'artists'].map((f) => `<button class="chip${libFilter === f ? ' on' : ''}" data-act="filter" data-f="${f}">${f === 'all' ? 'All' : f[0].toUpperCase() + f.slice(1)}</button>`).join('')}</div>
       <div class="lib-list">${items.map(libRow).join('') || '<div class="empty small"><p>Nothing here yet.</p></div>'}</div>
     </div>`;
@@ -491,4 +492,97 @@ export async function newPlaylist(tracks = []) {
   toast(tracks.length ? `Added to ${name}` : 'Playlist created');
   if (!tracks.length) location.hash = `#/playlist/${p.id}`;
   return p;
+}
+
+// ---------- Connect (GitHub Pages: which server?) & Settings ----------
+
+async function testServer(url) {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 8000);
+  try {
+    const r = await fetch(`${url}/api/library`, { signal: ctl.signal });
+    if (!r.ok) throw new Error(`server answered ${r.status}`);
+    await r.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function serverError(url, e) {
+  if (location.protocol === 'https:' && url.startsWith('http://') && !/^http:\/\/(localhost|127\.0\.0\.1)/.test(url)) {
+    return 'This page is HTTPS, so the server address must be HTTPS too. Use your Tailscale address (run “tailscale serve --bg 8484” on the computer).';
+  }
+  if (e?.name === 'AbortError') return 'No answer from that address. Is the server running, and is this device on the same network / tailnet?';
+  return `Couldn’t connect (${e?.message || e}). Check the address and that the server is running. If your browser asked to let this site access devices on your local network, choose Allow and try again.`;
+}
+
+function serverForm(current, btn) {
+  return `<form class="server-form">
+    <input class="input" name="server" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"
+      placeholder="https://my-computer.tailnet.ts.net" value="${esc(current)}">
+    <button class="btn">${esc(btn)}</button>
+    <p class="form-error" hidden></p>
+  </form>`;
+}
+
+function wireServerForm(el, onOk) {
+  const form = el.querySelector('.server-form');
+  const err = form.querySelector('.form-error');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = form.querySelector('button');
+    const url = form.server.value.trim().replace(/\/+$/, '');
+    const full = url && !/^https?:\/\//.test(url) ? `https://${url}` : url;
+    err.hidden = true;
+    btn.disabled = true;
+    btn.textContent = 'Connecting…';
+    try {
+      if (full) await testServer(full);
+      setServer(full);
+      onOk(full);
+    } catch (ex) {
+      err.textContent = serverError(full, ex);
+      err.hidden = false;
+      btn.disabled = false;
+      btn.textContent = 'Connect';
+    }
+  });
+}
+
+export function connect(el) {
+  setTitle('');
+  el.innerHTML = `<div class="page connect-page">
+    <img class="connect-logo" src="icons/icon.svg" alt="">
+    <h1>Connect to your music server</h1>
+    <p class="muted">music streams through a small server running on your computer. Enter its address. Over HTTPS (like this page) that's your Tailscale address — run <code>tailscale serve --bg 8484</code> on the computer to get one.</p>
+    ${serverForm('', 'Connect')}
+  </div>`;
+  wireServerForm(el, () => { location.hash = '#/'; location.reload(); });
+}
+
+export function settings(el) {
+  setTitle('Settings');
+  const current = BASE || location.origin;
+  el.innerHTML = `<div class="page settings-page">
+    <h1 class="greet">Settings</h1>
+    <section>
+      <h2 class="section-title">Server</h2>
+      <p class="muted">${ON_PAGES || BASE ? 'The music server this app plays through.' : `This app is being served by your music server at <b>${esc(location.origin)}</b>.`}</p>
+      ${ON_PAGES || BASE ? serverForm(current, 'Save') : ''}
+    </section>
+    <section>
+      <h2 class="section-title">Playback</h2>
+      <label class="toggle-row"><span><b>Autoplay</b><br><span class="muted small">When your queue ends, keep playing similar songs.</span></span>
+        <input type="checkbox" data-setting="autoplay" ${player.autoplay ? 'checked' : ''}></label>
+    </section>
+    <section>
+      <h2 class="section-title">This device</h2>
+      <p class="muted">${device.size} song${device.size === 1 ? '' : 's'} saved for offline listening on this device.</p>
+    </section>
+  </div>`;
+  if (ON_PAGES || BASE) wireServerForm(el, () => { toast('Server saved'); setTimeout(() => location.reload(), 400); });
+  el.querySelector('[data-setting="autoplay"]').addEventListener('change', (e) => {
+    player.autoplay = e.target.checked;
+    player.refreshMeta();
+  });
 }

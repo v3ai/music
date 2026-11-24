@@ -10,7 +10,7 @@ from pathlib import Path
 import httpx
 import yt_dlp
 
-from . import db
+from . import db, ytm
 from .config import DATA_DIR, DOWNLOAD_DIR
 
 # Prefer AAC/m4a: it plays everywhere (including iOS Safari / lock screen).
@@ -205,6 +205,17 @@ class Downloader:
         covers.mkdir(exist_ok=True)
         cover = covers / f"{tid}.jpg"
         art = t.get("art")
+        if ytm.is_video_art(art):
+            # a music video: try to use the album version's cover instead of a video frame
+            try:
+                found = ytm.match_song(t.get("title") or "", t.get("artists") or [])
+                db.art_store(tid, found)
+                if found:
+                    art = found["art"]
+                    t = {**t, "art": art, "album": t.get("album") or found.get("album")}
+                    db.upsert_track(t)
+            except Exception:
+                pass
         if art:
             big = re.sub(r"=w\d+-h\d+[^/]*$", "=w1200-h1200-l90-rj", art)
             try:
