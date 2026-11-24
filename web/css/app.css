@@ -364,12 +364,6 @@ body.is-playing .eq i { animation: eq 0.9s ease-in-out infinite; }
 
 .lib-head-btns, .side-lib-btns { display: flex; align-items: center; }
 .side-lib-btns .icon-btn svg { width: 20px; height: 20px; }
-.connect-page { max-width: 520px; margin: 0 auto; padding-top: 12vh; text-align: center; }
-.connect-logo { width: 72px; height: 72px; border-radius: 16px; margin: 0 auto 24px; }
-.connect-page h1 { font-size: 28px; font-weight: 800; letter-spacing: -.02em; margin-bottom: 12px; }
-.connect-page > p { margin-bottom: 24px; }
-.connect-page .server-form { margin: 0 auto; justify-content: center; }
-.connect-page .form-error { text-align: center; }
 code { background: var(--surface-3); padding: 1px 6px; border-radius: 4px; font-size: .9em; }
 .server-form { display: flex; flex-wrap: wrap; gap: 8px; max-width: 520px; margin-top: 12px; }
 .server-form .input { flex: 1 1 260px; }
@@ -381,9 +375,7 @@ code { background: var(--surface-3); padding: 1px 6px; border-radius: 4px; font-
 .toggle-row input::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .2s; }
 .toggle-row input:checked { background: #fff; }
 .toggle-row input:checked::after { background: #000; transform: translateX(18px); }
-body.connecting #player, body.connecting .tabbar, body.connecting .sidebar, body.connecting #topbar { display: none !important; }
-body.connecting #app { grid-template-columns: 1fr; }
-body.connecting #main { grid-column: 1 / -1; grid-row: 1 / -1; }
+.offline-note { margin-bottom: 16px; }
 
 /* ---------- downloads ---------- */
 

@@ -68,13 +68,13 @@ Settings (environment variables):
 
 ## Use it from GitHub Pages
 
-The app is also published at **https://v3ai.github.io/music/** on every push to `main` (see `.github/workflows/pages.yml`). Pages only hosts the app itself. It still plays through your own server, so:
+The app is also published at **https://v3ai.github.io/music/**, redeployed on every push to `main`. It opens straight into the app and connects to your server by itself. If the server isn't running, it still opens and plays your downloaded songs, then connects as soon as the server is up.
 
-1. Run the server (`./music` or `./music service`) and give it an HTTPS address with Tailscale: `tailscale serve --bg 8484`. Browsers block plain `http://` servers from HTTPS pages.
-2. Open https://v3ai.github.io/music/ and enter that address (e.g. `https://my-computer.tailnet.ts.net`). You can change it later in **Settings** (the gear in Your Library).
-3. If your browser asks to let the site access devices on your local network, choose **Allow**.
+How it finds the server, in order:
 
-You can install it to your home screen or desktop from there, like any other app.
+1. An address set under **Settings** (optional).
+2. The repo variable **`MUSIC_SERVER_URL`** (*Settings → Secrets and variables → Actions → Variables*), built into the site on deploy. Set it to an HTTPS address for your server, e.g. from Tailscale (`tailscale serve --bg 8484` → `https://my-computer.tailnet.ts.net`). Your phone then connects with nothing to enter.
+3. The server on the same computer (`http://localhost:8484`, desktop only). Chrome asks once to allow access to your local network.
 
 ## Keyboard shortcuts (desktop)
 

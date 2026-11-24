@@ -3,7 +3,7 @@
 
 import { api, lib, device, isSaved, toggleSave, download, removeDownload, createPlaylist, refreshPlaylists, slim, emit } from './state.js';
 import { player } from './player.js';
-import { BASE, ON_PAGES, setServer } from './config.js';
+import { BASE, ON_PAGES, connected, findServer, manualServer, setServer } from './config.js';
 import {
   icon, esc, art, img, mosaic, card, shelf, reg, trackRow, skeleton, errorView, fmtLong, fmtTime,
   artistLinks, artistsText, toast, prompt, confirmDialog, openMenu,
@@ -67,10 +67,11 @@ export async function home(el) {
   const h = new Date().getHours();
   const greet = h < 5 ? 'Good night' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
   setTitle('');
-  const cached = api.get('/home', 60000);
+  const cached = connected ? api.get('/home', 60000) : null;
   el.innerHTML = `<div class="page"><h1 class="greet">${greet}</h1>${skeleton('list')}</div>`;
   let d;
   try {
+    if (!connected) throw new Error('offline');
     d = await cached;
   } catch (e) {
     el.innerHTML = `<div class="page"><h1 class="greet">${greet}</h1>${offlineHome()}</div>`;
@@ -98,9 +99,12 @@ export async function home(el) {
 
 function offlineHome() {
   const tracks = [...device.values()];
-  if (!tracks.length) return errorView('Can’t reach your music server.');
+  const note = connected
+    ? 'You’re offline.'
+    : 'music isn’t running on your computer right now — it’ll connect by itself as soon as it is.';
+  if (!tracks.length) return `<div class="empty"><div class="empty-icon">${icon.note}</div><p>${note}</p></div>`;
   const key = reg(tracks, { opts: {} });
-  return `<p class="muted">You’re offline. Here’s what’s downloaded on this device.</p>${trackList(tracks, key)}`;
+  return `<p class="muted offline-note">${note} Your downloads:</p>${trackList(tracks, key)}`;
 }
 
 // ---------- Search ----------
@@ -494,82 +498,12 @@ export async function newPlaylist(tracks = []) {
   return p;
 }
 
-// ---------- Connect (GitHub Pages: which server?) & Settings ----------
-
-async function testServer(url) {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 8000);
-  try {
-    const r = await fetch(`${url}/api/library`, { signal: ctl.signal });
-    if (!r.ok) throw new Error(`server answered ${r.status}`);
-    await r.json();
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function serverError(url, e) {
-  if (location.protocol === 'https:' && url.startsWith('http://') && !/^http:\/\/(localhost|127\.0\.0\.1)/.test(url)) {
-    return 'This page is HTTPS, so the server address must be HTTPS too. Use your Tailscale address (run “tailscale serve --bg 8484” on the computer).';
-  }
-  if (e?.name === 'AbortError') return 'No answer from that address. Is the server running, and is this device on the same network / tailnet?';
-  return `Couldn’t connect (${e?.message || e}). Check the address and that the server is running. If your browser asked to let this site access devices on your local network, choose Allow and try again.`;
-}
-
-function serverForm(current, btn) {
-  return `<form class="server-form">
-    <input class="input" name="server" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"
-      placeholder="https://my-computer.tailnet.ts.net" value="${esc(current)}">
-    <button class="btn">${esc(btn)}</button>
-    <p class="form-error" hidden></p>
-  </form>`;
-}
-
-function wireServerForm(el, onOk) {
-  const form = el.querySelector('.server-form');
-  const err = form.querySelector('.form-error');
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn = form.querySelector('button');
-    const url = form.server.value.trim().replace(/\/+$/, '');
-    const full = url && !/^https?:\/\//.test(url) ? `https://${url}` : url;
-    err.hidden = true;
-    btn.disabled = true;
-    btn.textContent = 'Connecting…';
-    try {
-      if (full) await testServer(full);
-      setServer(full);
-      onOk(full);
-    } catch (ex) {
-      err.textContent = serverError(full, ex);
-      err.hidden = false;
-      btn.disabled = false;
-      btn.textContent = 'Connect';
-    }
-  });
-}
-
-export function connect(el) {
-  setTitle('');
-  el.innerHTML = `<div class="page connect-page">
-    <img class="connect-logo" src="icons/icon.svg" alt="">
-    <h1>Connect to your music server</h1>
-    <p class="muted">music streams through a small server running on your computer. Enter its address. Over HTTPS (like this page) that's your Tailscale address — run <code>tailscale serve --bg 8484</code> on the computer to get one.</p>
-    ${serverForm('', 'Connect')}
-  </div>`;
-  wireServerForm(el, () => { location.hash = '#/'; location.reload(); });
-}
+// ---------- Settings ----------
 
 export function settings(el) {
   setTitle('Settings');
-  const current = BASE || location.origin;
   el.innerHTML = `<div class="page settings-page">
     <h1 class="greet">Settings</h1>
-    <section>
-      <h2 class="section-title">Server</h2>
-      <p class="muted">${ON_PAGES || BASE ? 'The music server this app plays through.' : `This app is being served by your music server at <b>${esc(location.origin)}</b>.`}</p>
-      ${ON_PAGES || BASE ? serverForm(current, 'Save') : ''}
-    </section>
     <section>
       <h2 class="section-title">Playback</h2>
       <label class="toggle-row"><span><b>Autoplay</b><br><span class="muted small">When your queue ends, keep playing similar songs.</span></span>
@@ -577,12 +511,26 @@ export function settings(el) {
     </section>
     <section>
       <h2 class="section-title">This device</h2>
-      <p class="muted">${device.size} song${device.size === 1 ? '' : 's'} saved for offline listening on this device.</p>
+      <p class="muted">${device.size} song${device.size === 1 ? '' : 's'} saved for offline listening.</p>
     </section>
+    ${ON_PAGES ? `<section>
+      <h2 class="section-title">Server</h2>
+      <p class="muted small">${connected ? `Connected to ${esc(BASE)}.` : 'Not connected.'} Found automatically; only set this if yours isn’t.</p>
+      <form class="server-form">
+        <input class="input" name="server" type="url" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false"
+          placeholder="Automatic" value="${esc(manualServer())}">
+        <button class="btn">Save</button>
+      </form>
+    </section>` : ''}
   </div>`;
-  if (ON_PAGES || BASE) wireServerForm(el, () => { toast('Server saved'); setTimeout(() => location.reload(), 400); });
   el.querySelector('[data-setting="autoplay"]').addEventListener('change', (e) => {
     player.autoplay = e.target.checked;
     player.refreshMeta();
+  });
+  el.querySelector('.server-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    setServer(e.target.server.value);
+    toast((await findServer()) ? 'Connected' : 'Saved — can’t reach it right now');
+    setTimeout(() => location.reload(), 600);
   });
 }

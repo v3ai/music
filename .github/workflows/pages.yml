@@ -30,6 +30,12 @@ jobs:
       - name: Stamp service worker version
         run: sed -i "s/const VERSION = 'v1';/const VERSION = '${GITHUB_SHA::10}';/" web/sw.js
 
+      # optional: the address of your music server (repo Settings → Variables → MUSIC_SERVER_URL)
+      - name: Set default server
+        env:
+          SERVER: ${{ vars.MUSIC_SERVER_URL }}
+        run: sed -i "s|const DEFAULT_SERVER = '';|const DEFAULT_SERVER = '${SERVER}';|" web/js/config.js
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3

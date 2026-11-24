@@ -5,7 +5,7 @@ import {
   allTracks,
 } from './ui.js';
 import * as views from './views.js';
-import { needsServer } from './config.js';
+import { ON_PAGES, findServer, connected } from './config.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
@@ -112,10 +112,6 @@ const scrollPos = new Map();
 let lastHash = location.hash;
 
 async function route() {
-  if (needsServer) {
-    document.body.classList.add('connecting');
-    return views.connect(view);
-  }
   const hash = location.hash || '#/';
   const my = ++routeSeq;
   scrollPos.set(lastHash, main.scrollTop);
@@ -669,8 +665,32 @@ renderMode();
 renderTime();
 renderVolume();
 renderSidebar();
-if (!needsServer) loadLibrary();
+// GitHub Pages: find the music server first (usually one quick request). If it isn't
+// running, the app still opens normally and keeps checking in the background.
+if (ON_PAGES) await findServer();
+document.body.classList.toggle('server-offline', !connected);
+loadLibrary();
 route();
+
+if (ON_PAGES) {
+  let checking = false;
+  const recheck = async () => {
+    if (connected || checking || document.hidden) return;
+    checking = true;
+    try {
+      if (await findServer()) {
+        document.body.classList.remove('server-offline');
+        await loadLibrary();
+        route();
+      }
+    } finally {
+      checking = false;
+    }
+  };
+  setInterval(recheck, 10000);
+  window.addEventListener('online', recheck);
+  document.addEventListener('visibilitychange', recheck);
+}
 
 if ('serviceWorker' in navigator) {
   const hadController = !!navigator.serviceWorker.controller;

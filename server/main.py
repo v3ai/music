@@ -78,6 +78,11 @@ def _with_state(tracks):
     return tracks
 
 
+@app.get("/api/ping")
+async def ping():
+    return {"ok": True, "app": "music"}
+
+
 # ---------- browse ----------
 
 @app.get("/api/home")
