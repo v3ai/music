@@ -32,5 +32,16 @@ mpv=$(ldconfig -p | grep -oE '/[^ ]*libmpv\.so\.[0-9]+$' | head -1)
   --icon-file "$P/io.github.v3ai.music.png" \
   --custom-apprun "$P/AppRun"
 
+# Drop what GTK itself is built on: every system that runs the app has these, and
+# older copies from the build machine would clash with the desktop's newer GTK.
+for n in libglib-2.0 libgobject-2.0 libgio-2.0 libgmodule-2.0 libgthread-2.0 libffi libpcre2-8 \
+  libpango-1.0 libpangocairo-1.0 libpangoft2-1.0 libcairo libcairo-gobject libpixman-1 libgdk_pixbuf-2.0 \
+  libepoxy libharfbuzz libfontconfig libfreetype libpng16 libthai libdatrie libX11 libX11-xcb libXau \
+  libXdmcp libXext libXfixes libXi libXinerama libXrandr libXrender libXcursor libxcb libxcb-render \
+  libxcb-shm libxkbcommon libwayland-client libwayland-cursor libwayland-egl libdbus-1 libmount \
+  libblkid libselinux libz; do
+  rm -f "$APPDIR/usr/lib/$n.so."*
+done
+
 ARCH=x86_64 VERSION="$VERSION" "$TOOLS/appimagetool" --no-appstream "$APPDIR" "$OUT/music-linux-x86_64.AppImage"
 echo "built $OUT/music-linux-x86_64.AppImage"

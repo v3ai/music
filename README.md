@@ -4,14 +4,14 @@ An ad-free music player for **Android, Windows, macOS and Linux**, powered by Yo
 
 **Download: https://v3ai.github.io/music/**
 
-It looks and works like a normal streaming app: home feed, search, albums, artists, playlists, Liked Songs, queue, shuffle and repeat, lyrics, guitar tabs, and downloads. Music keeps playing with the screen off or the app in the background, with lock-screen, notification and headphone controls.
+It looks and works like a normal streaming app: home feed, search, albums, artists, playlists, Liked Songs, queue, shuffle and repeat, lyrics, guitar tabs and chords, and downloads. Music keeps playing with the screen off or the app in the background, with lock-screen, notification and headphone controls.
 
 - **No ads, no account, no server.** The app talks to YouTube Music directly from your device.
 - **Album art everywhere.** Music videos show the cover of the album their song is on.
 - **Downloads** are stored inside the app, so they play with no connection.
 - **Your library** (likes, playlists, saved albums and artists) lives on your device.
 - **Autoplay** keeps playing similar songs when your queue ends.
-- **Guitar and bass tabs** (from [Songsterr](https://www.songsterr.com)) that scroll along with the song. Tap a bar to jump there, pick another part from the menu, and nudge the timing with − / + if it's off. Most well-known songs have one.
+- **Guitar tabs and chords** from [Ultimate Guitar](https://www.ultimate-guitar.com): the best-rated tab or chord sheet for the song, with chord diagrams, capo and tuning, scrolling along as it plays. The menu lists every version (tabs, chords, bass, ukulele), plus [Songsterr](https://www.songsterr.com) tabs that follow the song bar by bar (tap a bar to jump there, nudge the timing with − / +).
 
 ## How it works
 
@@ -76,7 +76,7 @@ Android builds are signed with the key in the `MUSIC_KEYSTORE_BASE64` / `MUSIC_K
 | `L` | like current song |
 | `S` / `R` | shuffle / repeat |
 | `Q` | queue |
-| `T` | guitar tabs |
+| `T` | tabs & chords |
 | `Esc` | close now playing |
 
 Right-click any song for its menu.

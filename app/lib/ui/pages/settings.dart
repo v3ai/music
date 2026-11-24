@@ -35,7 +35,7 @@ class _SettingsPageState extends State<SettingsPage> {
           const _Header('Storage'),
           ListTile(
             title: const Text('Downloads', style: TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Text('${lib.downloads.length} songs • ${fmtBytes(dlSize)}', style: subtle),
+            subtitle: Text('${songs(lib.downloads.length)} • ${fmtBytes(dlSize)}', style: subtle),
             trailing: const Icon(Icons.chevron_right_rounded, color: C.sub),
             onTap: Nav.downloads,
           ),

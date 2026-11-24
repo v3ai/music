@@ -1,5 +1,9 @@
 #!/bin/sh
-# AppImage entry point: use the libraries packed inside (libmpv and what it needs).
+# AppImage entry point. GTK and friends come from the system (they must match the
+# desktop); the player's libmpv and everything it needs come from inside the AppImage.
 HERE="$(dirname "$(readlink -f "$0")")"
-export LD_LIBRARY_PATH="$HERE/usr/lib:$HERE/usr/share/music/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+for lib in "$HERE"/usr/lib/libmpv.so.*; do
+  export LIBMPV_LIBRARY_PATH="$lib"
+  break
+done
 exec "$HERE/usr/share/music/music" "$@"

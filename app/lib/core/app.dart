@@ -14,6 +14,7 @@ import 'player.dart';
 import 'proxy.dart';
 import 'streams.dart';
 import 'tabs.dart';
+import 'ug.dart';
 
 /// The app's services, created once at startup.
 class App {
@@ -25,6 +26,7 @@ class App {
   static late final Downloads downloads;
   static late final AlbumArt art;
   static late final Tabs tabs;
+  static late final UltimateGuitar ug;
   static late final Directory dataDir;
 
   static bool get isDesktop => Platform.isLinux || Platform.isWindows || Platform.isMacOS;
@@ -50,6 +52,7 @@ class App {
     await proxy.start();
     art = AlbumArt(lib, ytm);
     tabs = Tabs(Directory('${cache.path}/tabs'));
+    ug = UltimateGuitar(Directory('${cache.path}/tabs'));
     downloads = Downloads(lib, resolver, proxy, ytm, Directory('${support.path}/downloads'));
     player = Player(lib, ytm, resolver, proxy, art);
 

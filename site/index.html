@@ -42,16 +42,21 @@
   details p, details ol { color: var(--sub); margin-top: 10px; font-size: 15px; }
   details ol { padding-left: 20px; }
   code { background: #1c1c1c; padding: 2px 6px; border-radius: 4px; font-size: 13.5px; color: #e8e8e8; }
+  .shots { position: relative; margin: 52px 0 40px; }
+  .shots img { display: block; height: auto; }
+  .shots .desk { width: 100%; border-radius: 12px; border: 1px solid var(--line); }
+  .shots .phone { position: absolute; right: -14px; bottom: -36px; width: 23%; border-radius: 16px; border: 3px solid #222; box-shadow: 0 18px 48px rgba(0,0,0,.75); }
+  .shots figcaption { color: var(--sub); font-size: 14px; margin-top: 14px; max-width: 72%; }
   footer { margin-top: 56px; color: #6e6e6e; font-size: 13px; }
   footer a { color: var(--sub); }
-  @media (max-width: 520px) { h1 { font-size: 44px; } main { padding-top: 48px; } .btn { width: 100%; justify-content: center; } }
+  @media (max-width: 520px) { .shots .phone { right: 0; bottom: -24px; border-radius: 10px; border-width: 2px; } .shots figcaption { max-width: 70%; } h1 { font-size: 44px; } main { padding-top: 48px; } .btn { width: 100%; justify-content: center; } }
 </style>
 </head>
 <body>
 <main>
   <img class="logo" src="icon.svg" alt="">
   <h1>music</h1>
-  <p class="lead">An ad-free music player for your phone and computer. Search anything, make playlists, download songs, play along with guitar tabs, and keep listening with the screen off.</p>
+  <p class="lead">An ad-free music player for your phone and computer. Search anything, make playlists, download songs, play along with guitar tabs and chords, and keep listening with the screen off.</p>
 
   <div class="primary">
     <a class="btn" id="main-dl" href="https://github.com/v3ai/music/releases/latest">
@@ -69,11 +74,17 @@
     <a class="dl" href="https://github.com/v3ai/music/releases/latest/download/music-linux-x86_64.AppImage"><b>Linux</b><span>AppImage · x64</span></a>
   </div>
 
+  <figure class="shots">
+    <img class="desk" src="img/desktop.webp" width="1440" height="900" alt="music on a computer: April Come She Will by Simon &amp; Garfunkel playing, with its chord sheet and chord diagrams beside the album art">
+    <img class="phone" src="img/phone.webp" width="540" height="1200" alt="music on a phone showing the same chord sheet">
+    <figcaption>Chords and tabs for the song you're playing, on your computer and your phone.</figcaption>
+  </figure>
+
   <h2>What you get</h2>
   <ul class="feat">
     <li>Everything on YouTube Music: albums, artists, playlists, lyrics, with album art for every song.</li>
     <li>Plays in the background with lock-screen, notification and headphone controls.</li>
-    <li>Guitar and bass tabs that scroll along with the song.</li>
+    <li>Guitar tabs and chord sheets with chord diagrams for nearly every song, scrolling along as it plays.</li>
     <li>Download songs, albums and playlists to listen offline.</li>
     <li>Your own playlists and Liked Songs, kept on your device.</li>
     <li>Shuffle, repeat, queue, and endless similar songs when your music ends.</li>

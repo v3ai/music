@@ -75,7 +75,7 @@ class LibraryList extends StatelessWidget {
       rows.add(_Row(
         art: IconTile(Icons.favorite_rounded, size: size),
         title: 'Liked Songs',
-        subtitle: 'Playlist • ${lib.liked.length} songs',
+        subtitle: 'Playlist • ${songs(lib.liked.length)}',
         pinned: true,
         onTap: Nav.liked,
       ));
@@ -86,7 +86,7 @@ class LibraryList extends StatelessWidget {
       rows.add(_Row(
         art: IconTile(Icons.arrow_downward_rounded, size: size),
         title: 'Downloads',
-        subtitle: busy > 0 ? 'Downloading $busy…' : 'On this device • $n songs',
+        subtitle: busy > 0 ? 'Downloading $busy…' : 'On this device • ${songs(n)}',
         pinned: true,
         onTap: Nav.downloads,
       ));
@@ -96,7 +96,7 @@ class LibraryList extends StatelessWidget {
         rows.add(_Row(
           art: Mosaic(lib.playlistCovers(p), size: size),
           title: p.name,
-          subtitle: 'Playlist • ${p.trackIds.length} songs',
+          subtitle: 'Playlist • ${songs(p.trackIds.length)}',
           onTap: () => Nav.local(p.id),
           selected: route == 'local:${p.id}',
         ));

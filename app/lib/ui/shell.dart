@@ -310,7 +310,7 @@ class _Sidebar extends StatelessWidget {
 class _SideLibrary extends StatelessWidget {
   const _SideLibrary();
   @override
-  Widget build(BuildContext context) => Watch(player: false, builder: (_) => const LibraryList(compact: true, padding: EdgeInsets.symmetric(horizontal: 8)));
+  Widget build(BuildContext context) => Watch(player: false, builder: (_) => LibraryList(compact: true, padding: const EdgeInsets.symmetric(horizontal: 8)));
 }
 
 class _NavRow extends StatelessWidget {

@@ -22,6 +22,8 @@ String fmtLong(int seconds) {
   return '$m min ${seconds % 60} sec';
 }
 
+String songs(int n) => n == 1 ? '1 song' : '$n songs';
+
 String fmtBytes(int b) {
   if (b < 1024 * 1024) return '${(b / 1024).toStringAsFixed(0)} KB';
   if (b < 1024 * 1024 * 1024) return '${(b / 1024 / 1024).toStringAsFixed(1)} MB';
@@ -711,12 +713,17 @@ class MenuAction {
 }
 
 /// Bottom sheet on phones, popup menu on desktop.
-Future<void> showActions(BuildContext context, {required List<MenuAction> actions, Widget? header, Offset? position}) async {
+/// [growRight] opens the desktop menu to the right of [position] (under a dropdown)
+/// instead of toward the roomier side of the screen.
+Future<void> showActions(BuildContext context, {required List<MenuAction> actions, Widget? header, Offset? position, bool growRight = false}) async {
   if (position != null && isWide(context)) {
     final overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final choice = await showMenu<int>(
       context: context,
-      position: RelativeRect.fromRect(position & const Size(1, 1), Offset.zero & overlay.size),
+      // equal left/right insets make Flutter grow the menu in reading direction
+      position: growRight
+          ? RelativeRect.fromLTRB(position.dx, position.dy, position.dx, overlay.size.height - position.dy - 1)
+          : RelativeRect.fromRect(position & const Size(1, 1), Offset.zero & overlay.size),
       constraints: const BoxConstraints(minWidth: 220),
       items: [
         for (var i = 0; i < actions.length; i++)
@@ -837,7 +844,7 @@ Future<void> showAddToPlaylist(BuildContext context, List<Track> tracks) async {
             ListTile(
               leading: Mosaic(lib.playlistCovers(pl), size: 48),
               title: Text(pl.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-              subtitle: Text('${pl.trackIds.length} songs', style: subtle),
+              subtitle: Text(songs(pl.trackIds.length), style: subtle),
               onTap: () => Navigator.pop(c, pl.id),
             ),
         ]),
@@ -925,5 +932,5 @@ class TabsButton extends StatelessWidget {
   final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) =>
-      IconBtn(Icons.music_note_rounded, size: size, active: active, dot: active, tooltip: 'Guitar tabs', onTap: onTap, glyph: tabGlyph);
+      IconBtn(Icons.music_note_rounded, size: size, active: active, dot: active, tooltip: 'Tabs & chords', onTap: onTap, glyph: tabGlyph);
 }

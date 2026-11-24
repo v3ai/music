@@ -5,27 +5,152 @@ import 'package:material_ui/material_ui.dart';
 
 import '../core/app.dart';
 import '../core/tabs.dart';
+import '../core/ug.dart';
 import '../models.dart';
+import 'sheet_view.dart';
 import 'theme.dart';
 import 'widgets.dart';
 
-/// Guitar/bass tablature for [track] that scrolls along with the song.
-/// Tap a bar to jump there.
+/// The TAB panel: guitar tabs and chord sheets from Ultimate Guitar, plus Songsterr
+/// tabs that follow the song note by note. The menu switches between all of them.
 class TabsView extends StatefulWidget {
   const TabsView({super.key, required this.track, this.big = false});
   final Track track;
   final bool big;
   @override
-  State<TabsView> createState() => _TabsViewState();
+  State<TabsView> createState() => _TabsPanelState();
 }
 
-class _TabsViewState extends State<TabsView> with SingleTickerProviderStateMixin {
-  late Future<TabSong?> _song;
+class _TabsPanelState extends State<TabsView> {
+  late Future<(List<UgVersion>?, TabSong?)> _sources;
+  Object? _choice; // UgVersion, TabPartInfo (Songsterr part) or _synced; null = best
+
+  static const _synced = 'synced';
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(TabsView old) {
+    super.didUpdateWidget(old);
+    if (old.track.id != widget.track.id) _load();
+  }
+
+  void _load() {
+    _choice = null;
+    final ug = App.ug.versions(widget.track).then<List<UgVersion>?>((v) => v, onError: (_) => null);
+    final ss = App.tabs.find(widget.track).then<TabSong?>((v) => v, onError: (_) => null);
+    _sources = Future.wait([ug, ss]).then((r) => (r[0] as List<UgVersion>?, r[1] as TabSong?));
+  }
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<(List<UgVersion>?, TabSong?)>(
+    future: _sources,
+    builder: (c, s) {
+      if (s.connectionState != ConnectionState.done) return const Loading();
+      final (ug, song) = s.data ?? (null, null);
+      if (ug == null && song == null) return ErrorMessage(onRetry: () => setState(_load));
+      final versions = ug ?? const <UgVersion>[];
+      final choice = _choice ?? UltimateGuitar.best(versions) ?? (song != null ? _synced : null);
+      if (choice == null) {
+        return const Message(icon: Icons.music_off_rounded, title: 'No tabs or chords for this song', text: 'Nobody has written one up yet.');
+      }
+      Widget picker(String label) => _Picker(label: label, onOpen: (anchor) => _menu(anchor, versions, song, choice));
+      if (choice is UgVersion) {
+        return SheetView(key: ValueKey(choice.url), track: widget.track, version: choice, picker: picker, big: widget.big);
+      }
+      return SongsterrView(
+        key: ValueKey('ss${song!.songId}'),
+        track: widget.track,
+        song: song,
+        part: choice is TabPartInfo ? choice : null,
+        picker: picker,
+        big: widget.big,
+      );
+    },
+  );
+
+  void _menu(BuildContext anchor, List<UgVersion> versions, TabSong? song, Object current) {
+    final box = anchor.findRenderObject() as RenderBox?;
+    // a handful of the best of each kind keeps the menu short
+    final shown = <UgVersion>[];
+    final perKind = <String, int>{};
+    for (final v in versions) {
+      final n = perKind[v.type] = (perKind[v.type] ?? 0) + 1;
+      if (n <= 3 || v == current) shown.add(v);
+    }
+    showActions(
+      anchor,
+      position: box?.localToGlobal(box.size.bottomLeft(Offset.zero)),
+      growRight: true,
+      actions: [
+        for (final v in shown)
+          MenuAction(
+            v == current ? Icons.check_rounded : (v.isChords ? Icons.grid_view_rounded : Icons.music_note_rounded),
+            v.label,
+            () => setState(() => _choice = v),
+          ),
+        if (song != null)
+          for (final p in song.parts.where((p) => p.kind != 'vocals'))
+            MenuAction(
+              (current is TabPartInfo && current.index == p.index) ? Icons.check_rounded : Icons.sync_rounded,
+              'Synced · ${p.label} · ${p.tuningName}',
+              () => setState(() => _choice = p),
+            ),
+      ],
+    );
+  }
+}
+
+class _Picker extends StatelessWidget {
+  const _Picker({required this.label, required this.onOpen});
+  final String label;
+  final void Function(BuildContext anchor) onOpen;
+  @override
+  Widget build(BuildContext context) => InkWell(
+    borderRadius: BorderRadius.circular(999),
+    onTap: () => onOpen(context),
+    child: Container(
+      padding: const EdgeInsets.fromLTRB(14, 7, 8, 7),
+      decoration: BoxDecoration(color: const Color(0x1FFFFFFF), borderRadius: BorderRadius.circular(999)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+          ),
+          const Icon(Icons.arrow_drop_down_rounded, size: 20, color: C.sub),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Songsterr tablature that follows the song note by note. Tap a bar to jump there.
+class SongsterrView extends StatefulWidget {
+  const SongsterrView({super.key, required this.track, required this.song, this.part, required this.picker, this.big = false});
+  final Track track;
+  final TabSong song;
+  final TabPartInfo? part; // null = the best guitar part
+  final Widget Function(String label) picker;
+  final bool big;
+  @override
+  State<SongsterrView> createState() => _SongsterrViewState();
+}
+
+class _SongsterrViewState extends State<SongsterrView> with SingleTickerProviderStateMixin {
   Future<TabPart>? _part;
   TabPart? _shown;
   TabClock? _clock;
   TabSong? _s;
-  int _err = 0;
 
   final _scroll = ScrollController();
   final _now = ValueNotifier<double>(0); // playback position, seconds
@@ -55,9 +180,9 @@ class _TabsViewState extends State<TabsView> with SingleTickerProviderStateMixin
   }
 
   @override
-  void didUpdateWidget(TabsView old) {
+  void didUpdateWidget(SongsterrView old) {
     super.didUpdateWidget(old);
-    if (old.track.id != widget.track.id) {
+    if (old.track.id != widget.track.id || old.song != widget.song || old.part?.index != widget.part?.index) {
       _load();
     }
   }
@@ -69,11 +194,9 @@ class _TabsViewState extends State<TabsView> with SingleTickerProviderStateMixin
     _part = null;
     _layout = null;
     _sysShown = -1;
-    _song = App.tabs.find(widget.track).then((s) {
-      _s = s;
-      if (s != null) _part = App.tabs.defaultPart(s).then(_setPart);
-      return s;
-    });
+    final s = _s = widget.song;
+    final p = widget.part;
+    _part = (p == null ? App.tabs.defaultPart(s) : App.tabs.part(s, p)).then(_setPart);
   }
 
   TabPart _setPart(TabPart p) {
@@ -85,12 +208,6 @@ class _TabsViewState extends State<TabsView> with SingleTickerProviderStateMixin
       _sysShown = -1;
     });
     return p;
-  }
-
-  void _choosePart(TabPartInfo info) {
-    final s = _s;
-    if (s == null) return;
-    setState(() => _part = App.tabs.part(s, info).then(_setPart));
   }
 
   void _nudge(double by) {
@@ -154,96 +271,36 @@ class _TabsViewState extends State<TabsView> with SingleTickerProviderStateMixin
   }
 
   @override
-  Widget build(BuildContext context) => FutureBuilder<TabSong?>(
-    key: ValueKey('${widget.track.id}#$_err'),
-    future: _song,
-    builder: (c, s) {
-      if (s.hasError) {
+  Widget build(BuildContext context) => FutureBuilder<TabPart>(
+    future: _part,
+    builder: (c, ps) {
+      if (ps.hasError && _shown == null) {
         return ErrorMessage(
           onRetry: () => setState(() {
-            _err++;
             _load();
           }),
         );
       }
-      if (s.connectionState != ConnectionState.done) return const Loading();
-      final song = s.data;
-      if (song == null) {
-        return const Message(icon: Icons.music_off_rounded, title: 'No tab for this song', text: 'There isn’t a guitar tab for this one yet.');
-      }
-      return FutureBuilder<TabPart>(
-        future: _part,
-        builder: (c, ps) {
-          if (ps.hasError && _shown == null) {
-            return ErrorMessage(
-              onRetry: () => setState(() {
-                _err++;
-                _load();
-              }),
-            );
-          }
-          final part = _shown;
-          if (part == null) return const Loading();
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _header(context, song, part),
-              const SizedBox(height: 8),
-              Expanded(child: _body(part)),
-            ],
-          );
-        },
+      final part = _shown;
+      if (part == null) return const Loading();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _header(context, part),
+          const SizedBox(height: 8),
+          Expanded(child: _body(part)),
+        ],
       );
     },
   );
 
-  Widget _header(BuildContext context, TabSong song, TabPart part) {
+  Widget _header(BuildContext context, TabPart part) {
     final off = App.tabs.offsets[widget.track.id] ?? 0;
     final synced = _clock?.synced ?? false;
     return Row(
       children: [
         Expanded(
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Builder(
-              builder: (bc) => InkWell(
-                borderRadius: BorderRadius.circular(999),
-                onTap: () {
-                  final box = bc.findRenderObject() as RenderBox?;
-                  showActions(
-                    context,
-                    position: box?.localToGlobal(box.size.bottomLeft(Offset.zero)),
-                    actions: [
-                      for (final p in song.parts.where((p) => p.kind != 'vocals'))
-                        MenuAction(
-                          p.index == part.info.index ? Icons.check_rounded : (p.kind == 'bass' ? Icons.graphic_eq_rounded : Icons.music_note_rounded),
-                          '${p.label} · ${p.tuningName}',
-                          () => _choosePart(p),
-                        ),
-                    ],
-                  );
-                },
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(14, 7, 8, 7),
-                  decoration: BoxDecoration(color: const Color(0x1FFFFFFF), borderRadius: BorderRadius.circular(999)),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Flexible(
-                        child: Text(
-                          '${part.info.label} · ${part.info.tuningName}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                        ),
-                      ),
-                      const Icon(Icons.arrow_drop_down_rounded, size: 20, color: C.sub),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
+          child: Align(alignment: Alignment.centerLeft, child: widget.picker('Synced · ${part.info.label}')),
         ),
         const SizedBox(width: 8),
         Tooltip(

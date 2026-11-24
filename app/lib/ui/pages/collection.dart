@@ -53,8 +53,8 @@ class CollectionPage extends StatelessWidget {
             builder: (c, p) => _Remote(p),
           ),
         LocalSource s => Watch(player: false, builder: (_) => _Local(s.id)),
-        LikedSource _ => Watch(player: false, builder: (_) => const _Liked()),
-        DownloadsSource _ => Watch(player: false, builder: (_) => const _Downloads()),
+        LikedSource _ => Watch(player: false, builder: (_) => _Liked()),
+        DownloadsSource _ => Watch(player: false, builder: (_) => _Downloads()),
       };
 }
 

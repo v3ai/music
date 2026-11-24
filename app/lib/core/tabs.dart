@@ -274,15 +274,15 @@ class Tabs {
     return t.trim().isEmpty ? s : t.trim();
   }
 
-  static String _norm(String s) => s.toLowerCase().replaceAll('&', 'and').replaceAll(RegExp(r'[^a-z0-9]+'), '');
+  static String norm(String s) => s.toLowerCase().replaceAll('&', 'and').replaceAll(RegExp(r'[^a-z0-9]+'), '');
 
   static const _badWords = ['cover', 'fingerstyle', 'acoustic', 'lesson', 'solo', 'bass', 'guitar', 'drum', 'instrumental', 'karaoke', 'if it had', 'piano', 'tutorial', 'live'];
 
   double _score(Track t, String title, Map r) {
     final rt = '${r['title'] ?? ''}';
-    final ra = _norm('${r['artist'] ?? ''}');
-    final want = _norm(title);
-    final got = _norm(cleanTitle(rt));
+    final ra = norm('${r['artist'] ?? ''}');
+    final want = norm(title);
+    final got = norm(cleanTitle(rt));
     if (want.isEmpty || got.isEmpty) return 0;
     var s = 0.0;
     if (got == want) {
@@ -294,7 +294,7 @@ class Tabs {
     } else {
       return 0;
     }
-    final artists = [for (final a in t.artists) _norm(a.name)].where((a) => a.isNotEmpty);
+    final artists = [for (final a in t.artists) norm(a.name)].where((a) => a.isNotEmpty);
     if (artists.any((a) => ra == a)) {
       s += 2;
     } else if (artists.any((a) => ra.contains(a) || a.contains(ra))) {
