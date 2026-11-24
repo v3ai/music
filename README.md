@@ -38,6 +38,7 @@ cd app
 flutter run                 # on a connected phone or this computer
 flutter build apk           # Android
 flutter build linux         # Linux (needs libgtk-3-dev, libmpv-dev)
+sh packaging/linux/build-appimage.sh   # …then pack it as an AppImage
 flutter build windows       # Windows
 flutter build macos         # macOS
 ```
@@ -47,6 +48,15 @@ flutter build macos         # macOS
 ## Releasing
 
 Push a tag to build every platform on GitHub Actions and publish a release. The download page always points at the latest one.
+
+| platform | file | |
+|---|---|---|
+| Android | `music-android.apk` | open it on the phone to install |
+| Windows | `music-windows-setup.exe` | one-click installer, no admin needed |
+| macOS | `music-macos.dmg` | drag to Applications |
+| Linux | `music-linux-x86_64.AppImage` | one file, adds itself to the app menu on first run |
+
+`app/packaging/` has the installer scripts (`linux/build-appimage.sh`, `windows/music.iss`).
 
 ```bash
 git tag v1.0.0 && git push origin v1.0.0

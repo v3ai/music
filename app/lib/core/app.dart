@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../yt/innertube.dart';
 import '../yt/ytm.dart';
+import 'desktop_integration.dart';
 import 'downloads.dart';
 import 'images.dart';
 import 'library.dart';
@@ -70,5 +71,6 @@ class App {
     }
     await player.init(handler);
     downloads.start();
+    integrateAppImage().ignore();
   }
 }

@@ -1,0 +1,5 @@
+#!/bin/sh
+# AppImage entry point: use the libraries packed inside (libmpv and what it needs).
+HERE="$(dirname "$(readlink -f "$0")")"
+export LD_LIBRARY_PATH="$HERE/usr/lib:$HERE/usr/share/music/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+exec "$HERE/usr/share/music/music" "$@"

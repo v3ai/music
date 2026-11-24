@@ -64,9 +64,9 @@
 
   <div class="grid">
     <a class="dl" href="https://github.com/v3ai/music/releases/latest/download/music-android.apk"><b>Android</b><span>.apk · Android 7+</span></a>
-    <a class="dl" href="https://github.com/v3ai/music/releases/latest/download/music-windows-x64.zip"><b>Windows</b><span>.zip · Windows 10+</span></a>
-    <a class="dl" href="https://github.com/v3ai/music/releases/latest/download/music-macos.zip"><b>macOS</b><span>.zip · macOS 12+</span></a>
-    <a class="dl" href="https://github.com/v3ai/music/releases/latest/download/music-linux-x64.tar.gz"><b>Linux</b><span>.tar.gz · x64</span></a>
+    <a class="dl" href="https://github.com/v3ai/music/releases/latest/download/music-windows-setup.exe"><b>Windows</b><span>Installer · Windows 10+</span></a>
+    <a class="dl" href="https://github.com/v3ai/music/releases/latest/download/music-macos.dmg"><b>macOS</b><span>.dmg · macOS 12+</span></a>
+    <a class="dl" href="https://github.com/v3ai/music/releases/latest/download/music-linux-x86_64.AppImage"><b>Linux</b><span>AppImage · x64</span></a>
   </div>
 
   <h2>What you get</h2>
@@ -91,23 +91,24 @@
   <details id="h-windows">
     <summary>Windows</summary>
     <ol>
-      <li>Download and unzip <code>music-windows-x64.zip</code>, for example into your Documents folder.</li>
-      <li>Open <code>music.exe</code>. If Windows SmartScreen appears, click <b>More info → Run anyway</b>.</li>
-      <li>Right-click it in the taskbar and choose <b>Pin to taskbar</b>.</li>
+      <li>Open <code>music-windows-setup.exe</code>. It installs in a few seconds and opens music.</li>
+      <li>If Windows SmartScreen appears, click <b>More info → Run anyway</b>.</li>
     </ol>
+    <p>music is then in your Start menu. Remove it any time from <b>Settings → Apps</b>.</p>
   </details>
   <details id="h-macos">
     <summary>macOS</summary>
     <ol>
-      <li>Download and open <code>music-macos.zip</code>, then drag <b>music</b> into Applications.</li>
-      <li>The first time, right-click it and choose <b>Open</b>, then <b>Open</b> again. (It isn’t signed with an Apple developer ID.)</li>
+      <li>Open <code>music-macos.dmg</code> and drag <b>music</b> onto <b>Applications</b>.</li>
+      <li>Open music from Applications. The first time, macOS says it can’t check the app (it isn’t from the App Store): click <b>Done</b>, go to <b>System Settings → Privacy &amp; Security</b>, scroll down and click <b>Open Anyway</b>.</li>
     </ol>
   </details>
   <details id="h-linux">
     <summary>Linux</summary>
     <ol>
-      <li>Download and extract <code>music-linux-x64.tar.gz</code>.</li>
-      <li>Run <code>./music/install.sh</code> to add it to your app menu. It needs <code>libmpv</code> (on Ubuntu: <code>sudo apt install libmpv2</code>).</li>
+      <li>Download <code>music-linux-x86_64.AppImage</code>.</li>
+      <li>Allow it to run: right-click it → <b>Properties</b> → <b>Allow executing as program</b> (or <code>chmod +x music-linux-x86_64.AppImage</code>).</li>
+      <li>Double-click it. music adds itself to your app menu, so next time just open it from there.</li>
     </ol>
   </details>
   <details>
@@ -126,9 +127,9 @@
   const ua = navigator.userAgent;
   const plats = {
     android: ['Download for Android', 'music-android.apk'],
-    windows: ['Download for Windows', 'music-windows-x64.zip'],
-    macos: ['Download for Mac', 'music-macos.zip'],
-    linux: ['Download for Linux', 'music-linux-x64.tar.gz'],
+    windows: ['Download for Windows', 'music-windows-setup.exe'],
+    macos: ['Download for Mac', 'music-macos.dmg'],
+    linux: ['Download for Linux', 'music-linux-x86_64.AppImage'],
   };
   const os = /Android/i.test(ua) ? 'android'
     : /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) ? 'ios'
