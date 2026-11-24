@@ -1,9 +1,11 @@
 import 'dart:math' as math;
 
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter/scheduler.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../core/app.dart';
+import '../core/tabs.dart';
 import '../core/ug.dart';
 import '../models.dart';
 import 'theme.dart';
@@ -28,8 +30,22 @@ class _SheetViewState extends State<SheetView> with SingleTickerProviderStateMix
   late Future<UgSheet> _sheet = App.ug.sheet(widget.version);
   final _scroll = ScrollController();
   late final Ticker _ticker;
-  DateTime _userScrolled = DateTime(2000);
   bool get _follow => App.lib.setting<bool>('sheetAutoScroll', true);
+
+  // Pacing: the sheet is a timeline of beats (tab rows = their bars, chord lines = one
+  // bar per chord) played at a tempo. [_anchorBeats] is where we were at song time
+  // [_anchorT]; scrolling by hand moves the anchor to wherever you scrolled.
+  List<double> _beats = const []; // beats at the start of each paced line, plus the end
+  List<int> _paced = const []; // which lines those are
+  List<GlobalKey> _keys = const [];
+  final _endKey = GlobalKey();
+  final _contentKey = GlobalKey();
+  List<double>? _ys; // their offsets in the scroll content
+  double _anchorBeats = 0, _anchorT = 0;
+  bool _dragging = false;
+  double? _songBpm; // from Songsterr's tempo map, if it has the song
+  double _fitBpm = 100; // fits the whole sheet into the song
+  String? _layoutKey;
 
   @override
   void initState() {
@@ -37,6 +53,59 @@ class _SheetViewState extends State<SheetView> with SingleTickerProviderStateMix
     _ticker = createTicker((_) => _tick());
     App.player.addListener(_playState);
     _playState();
+    App.tabs.find(widget.track).then<TabPart?>((s) => s == null ? null : App.tabs.defaultPart(s)).then((p) {
+      if (p == null || p.wholeSecs.isEmpty || !mounted) return;
+      final w = [...p.wholeSecs]..sort();
+      final bpm = 240 / w[w.length ~/ 2]; // a whole note is 4 beats
+      if (bpm > 30 && bpm < 300) setState(() => _rebase(() => _songBpm = bpm));
+    }, onError: (_) {});
+  }
+
+  String get _key => widget.version.url;
+  double? get _savedBpm => (App.lib.setting<Map>('sheetBpm', const {})[_key] as num?)?.toDouble();
+
+  /// The song's own tempo when the sheet seems to cover the whole song at it
+  /// (half or double time counts), otherwise a tempo that fits the sheet to the song.
+  double get _defaultBpm {
+    final song = _songBpm;
+    if (song != null) {
+      for (final m in const [1.0, 2.0, .5]) {
+        final r = song * m / _fitBpm;
+        if (r > .7 && r < 1.4) return song * m;
+      }
+    }
+    return _fitBpm;
+  }
+
+  double get _bpm => _savedBpm ?? _defaultBpm;
+  bool get _isSongTempo => _savedBpm == null && _songBpm != null && _defaultBpm != _fitBpm;
+
+  double get _now {
+    final p = App.player;
+    return p.current?.id == widget.track.id ? p.position.inMilliseconds / 1000 : 0;
+  }
+
+  double _beatsAt(double t) => _anchorBeats + (t - _anchorT) * _bpm / 60;
+
+  /// Change the tempo (or anything it depends on) without jumping: keep the current spot.
+  void _rebase(void Function() change) {
+    final t = _now, b = _beatsAt(t);
+    change();
+    _anchorBeats = b;
+    _anchorT = t;
+  }
+
+  void _setBpm(double? bpm) {
+    final map = Map<String, dynamic>.of(App.lib.setting<Map>('sheetBpm', const {}).cast<String, dynamic>());
+    _rebase(() {
+      if (bpm == null) {
+        map.remove(_key);
+      } else {
+        map[_key] = bpm.clamp(30, 300).roundToDouble();
+      }
+      App.lib.setSetting('sheetBpm', map);
+    });
+    setState(() {});
   }
 
   void _playState() {
@@ -46,27 +115,66 @@ class _SheetViewState extends State<SheetView> with SingleTickerProviderStateMix
     if (!on && _ticker.isActive) _ticker.stop();
   }
 
-  /// Glide toward the spot matching how far through the song we are.
+  List<double>? _measure() {
+    if (_ys != null) return _ys;
+    final content = _contentKey.currentContext?.findRenderObject() as RenderBox?;
+    if (content == null || !content.hasSize) return null;
+    double y(GlobalKey k) {
+      final box = k.currentContext?.findRenderObject() as RenderBox?;
+      return box == null || !box.hasSize ? double.nan : box.localToGlobal(Offset.zero, ancestor: content).dy;
+    }
+
+    final ys = [for (final k in _keys) y(k), y(_endKey)];
+    if (ys.any((v) => v.isNaN)) return null;
+    return _ys = ys;
+  }
+
+  double _yForBeats(double beats, List<double> ys) {
+    final bs = _beats;
+    if (beats <= bs.first) return ys.first;
+    for (var i = 0; i < bs.length - 1; i++) {
+      if (beats < bs[i + 1]) return ys[i] + (ys[i + 1] - ys[i]) * (beats - bs[i]) / (bs[i + 1] - bs[i]);
+    }
+    return ys.last;
+  }
+
+  double _beatsForY(double y, List<double> ys) {
+    final bs = _beats;
+    if (y <= ys.first) return bs.first;
+    for (var i = 0; i < ys.length - 1; i++) {
+      if (y < ys[i + 1]) return bs[i] + (bs[i + 1] - bs[i]) * (y - ys[i]) / math.max(1, ys[i + 1] - ys[i]);
+    }
+    return bs.last;
+  }
+
+  double get _focus => _scroll.position.viewportDimension * .25; // the line being played sits here
+
   void _tick() {
-    final p = App.player;
-    if (p.current?.id != widget.track.id || !_scroll.hasClients) return;
-    if (DateTime.now().difference(_userScrolled) < const Duration(seconds: 5)) return;
-    final dur = p.duration.inMilliseconds / 1000;
-    if (dur <= 0) return;
-    final pos = p.position.inMilliseconds / 1000;
-    // the first and last bits of a song are usually intro/outro
-    final frac = ((pos - math.min(8, dur * .05)) / (dur * .9)).clamp(0.0, 1.0);
-    final max = _scroll.position.maxScrollExtent;
-    if (max <= 0) return;
-    final target = frac * max;
+    if (_dragging || !_scroll.hasClients || App.player.current?.id != widget.track.id || _beats.length < 2) return;
+    final ys = _measure();
+    if (ys == null) return;
+    final target = (_yForBeats(_beatsAt(_now), ys) - _focus).clamp(0.0, _scroll.position.maxScrollExtent);
     final cur = _scroll.offset;
-    if ((target - cur).abs() < .5) return;
-    _scroll.jumpTo(cur + (target - cur) * .06);
+    if ((target - cur).abs() < .3) return;
+    // glide; jump outright after a seek
+    _scroll.jumpTo((target - cur).abs() > 600 ? target : cur + (target - cur) * .12);
+  }
+
+  /// After scrolling by hand, carry on from there.
+  bool _onScroll(UserScrollNotification n) {
+    _dragging = n.direction != ScrollDirection.idle;
+    if (!_dragging && _scroll.hasClients) {
+      final ys = _measure();
+      if (ys != null && _beats.length >= 2) {
+        _anchorBeats = _beatsForY(_scroll.offset + _focus, ys);
+        _anchorT = _now;
+      }
+    }
+    return false;
   }
 
   void _toggleFollow() {
     App.lib.setSetting('sheetAutoScroll', !_follow);
-    _userScrolled = DateTime(2000);
     setState(_playState);
   }
 
@@ -94,6 +202,7 @@ class _SheetViewState extends State<SheetView> with SingleTickerProviderStateMix
               Expanded(
                 child: Align(alignment: Alignment.centerLeft, child: widget.picker('${v.kind} · ★ ${v.rating.toStringAsFixed(1)}')),
               ),
+              if (_follow) _tempo(),
               IconBtn(
                 Icons.keyboard_double_arrow_down_rounded,
                 size: 20,
@@ -110,6 +219,40 @@ class _SheetViewState extends State<SheetView> with SingleTickerProviderStateMix
       );
     },
   );
+
+  Widget _tempo() {
+    final bpm = _bpm.round();
+    final custom = _savedBpm != null;
+    final song = _songBpm?.round();
+    final what = custom
+        ? 'Your tempo'
+        : !_isSongTempo
+        ? 'Paced to fit the song'
+        : bpm == song
+        ? 'The song’s tempo'
+        : '${bpm < song! ? 'Half' : 'Double'} the song’s $song BPM, to match how it’s written';
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconBtn(Icons.remove_rounded, size: 18, tooltip: 'Scroll slower', onTap: () => _setBpm(_bpm - 4)),
+        Tooltip(
+          message: '$what${custom ? '. Tap to reset.' : ''}',
+          child: InkWell(
+            borderRadius: BorderRadius.circular(6),
+            onTap: custom ? () => _setBpm(null) : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+              child: Text(
+                '♩ $bpm',
+                style: TextStyle(fontFamily: _mono, fontWeight: FontWeight.w700, fontSize: 13, color: custom ? Colors.white : C.sub),
+              ),
+            ),
+          ),
+        ),
+        IconBtn(Icons.add_rounded, size: 18, tooltip: 'Scroll faster', onTap: () => _setBpm(_bpm + 4)),
+      ],
+    );
+  }
 
   Widget _body(UgSheet sheet) => LayoutBuilder(
     builder: (c, box) {
@@ -131,40 +274,47 @@ class _SheetViewState extends State<SheetView> with SingleTickerProviderStateMix
         cols = ((box.maxWidth - 4) / charW(size)).floor();
       }
       final lines = layoutSheet(sheet.content, math.max(20, cols));
+
+      // re-time the sheet when its layout changes (first build, resize)
+      final lk = '${box.maxWidth.round()}x$size';
+      if (lk != _layoutKey) {
+        final weights = sheetBeats(lines);
+        final paced = [
+          for (var i = 0; i < lines.length; i++)
+            if (weights[i] > 0) i,
+        ];
+        final beats = <double>[0];
+        for (final i in paced) {
+          beats.add(beats.last + weights[i]);
+        }
+        final first = _layoutKey == null;
+        _rebase(() {
+          _layoutKey = lk;
+          _paced = paced;
+          _beats = beats;
+          _keys = [for (final _ in paced) GlobalKey()];
+          _ys = null;
+          final dur = App.player.current?.id == widget.track.id ? App.player.duration.inMilliseconds / 1000 : (widget.track.duration ?? 0).toDouble();
+          if (dur > 0 && beats.last > 0) _fitBpm = (beats.last / (dur * .92 / 60)).clamp(30, 300).toDouble();
+        });
+        if (first) {
+          // the sheet starts after a short intro
+          final dur = (widget.track.duration ?? 0).toDouble();
+          _anchorBeats = 0;
+          _anchorT = dur > 0 ? math.min(8, dur * .04) : 0;
+        }
+        WidgetsBinding.instance.addPostFrameCallback((_) => _ys = null);
+      }
+      final pacedAt = {for (var k = 0; k < _paced.length; k++) _paced[k]: _keys[k]};
+
       final info = [
         if (sheet.capo > 0) 'Capo ${_ordinal(sheet.capo)} fret',
         if (sheet.tuning != null && sheet.tuning != 'E A D G B E') 'Tuning ${sheet.tuning}',
         if (sheet.key != null && sheet.key!.isNotEmpty) 'Key ${sheet.key}',
-      ];
-      final items = <Widget>[
-        if (info.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Text(
-              info.join('  ·  '),
-              style: const TextStyle(color: C.sub, fontSize: 13, fontWeight: FontWeight.w600),
-            ),
-          ),
-        if (sheet.chords.isNotEmpty)
-          SizedBox(
-            height: 112,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: [for (final ch in sheet.chords) Padding(padding: const EdgeInsets.only(right: 14), child: ChordDiagram(ch))],
-            ),
-          ),
-        if (sheet.chords.isNotEmpty) const SizedBox(height: 10),
-        for (final l in lines) _line(l, size),
-        Padding(
-          padding: const EdgeInsets.only(top: 28),
-          child: Text('From Ultimate Guitar · ${sheet.version.artist} – ${sheet.version.song}', style: subtle),
-        ),
+        if (_songBpm != null) '${_songBpm!.round()} BPM',
       ];
       return NotificationListener<UserScrollNotification>(
-        onNotification: (_) {
-          _userScrolled = DateTime.now();
-          return false;
-        },
+        onNotification: _onScroll,
         child: ShaderMask(
           shaderCallback: (r) => const LinearGradient(
             begin: Alignment.topCenter,
@@ -173,11 +323,38 @@ class _SheetViewState extends State<SheetView> with SingleTickerProviderStateMix
             stops: [0, .03, .93, 1],
           ).createShader(r),
           blendMode: BlendMode.dstIn,
-          child: ListView.builder(
+          child: SingleChildScrollView(
             controller: _scroll,
-            padding: const EdgeInsets.only(top: 8, bottom: 120),
-            itemCount: items.length,
-            itemBuilder: (_, i) => items[i],
+            padding: EdgeInsets.only(top: 8, bottom: box.maxHeight * .7),
+            child: Column(
+              key: _contentKey,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (info.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      info.join('  ·  '),
+                      style: const TextStyle(color: C.sub, fontSize: 13, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                if (sheet.chords.isNotEmpty)
+                  SizedBox(
+                    height: 112,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [for (final ch in sheet.chords) Padding(padding: const EdgeInsets.only(right: 14), child: ChordDiagram(ch))],
+                    ),
+                  ),
+                if (sheet.chords.isNotEmpty) const SizedBox(height: 10),
+                for (var i = 0; i < lines.length; i++) KeyedSubtree(key: pacedAt[i], child: _line(lines[i], size)),
+                Padding(
+                  key: _endKey,
+                  padding: const EdgeInsets.only(top: 28),
+                  child: Text('From Ultimate Guitar · ${sheet.version.artist} – ${sheet.version.song}', style: subtle),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -350,6 +527,29 @@ List<SheetLine> _wrapBlock(List<SheetLine> block, int cols) {
     if (kept.isEmpty) continue;
     if (out.isNotEmpty) out.add(const SheetLine('', [], aligned: true));
     out.addAll(kept);
+  }
+  return out;
+}
+
+/// How many beats each line takes to play (0 = no time of its own): a tab row its
+/// bars (in 4/4), a chord line a bar per chord. Lyrics ride along with their chords.
+List<double> sheetBeats(List<SheetLine> lines) {
+  final out = List<double>.filled(lines.length, 0);
+  for (var i = 0; i < lines.length; i++) {
+    final l = lines[i];
+    if (l.tab) {
+      if (i > 0 && lines[i - 1].tab) continue; // one count per row of strings
+      final bars = '|'.allMatches(l.text.replaceAll('||', '|')).length - 1;
+      out[i] = 4.0 * math.max(1, bars);
+    } else if (l.chords.isNotEmpty) {
+      out[i] = 4.0 * l.chords.length;
+    }
+  }
+  // plain text only: give every line a bar so it still moves
+  if (out.every((b) => b == 0)) {
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].text.trim().isNotEmpty && !lines[i].header) out[i] = 4;
+    }
   }
   return out;
 }

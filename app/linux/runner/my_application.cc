@@ -57,6 +57,15 @@ static void my_application_activate(GApplication* application) {
   gtk_window_set_title(window, "music");
   set_window_icon(window);
 
+  // Black behind the app too. While the window is resized, maximized or made
+  // fullscreen, edges the app hasn't redrawn yet show the window's own background;
+  // the theme's (often light) colour there flickers against the black app.
+  g_object_set(gtk_settings_get_default(), "gtk-application-prefer-dark-theme", TRUE, nullptr);
+  g_autoptr(GtkCssProvider) css = gtk_css_provider_new();
+  gtk_css_provider_load_from_data(css, "window, window.background { background-color: #000000; }", -1, nullptr);
+  gtk_style_context_add_provider(gtk_widget_get_style_context(GTK_WIDGET(window)), GTK_STYLE_PROVIDER(css),
+                                 GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(
       project, self->dart_entrypoint_arguments);
