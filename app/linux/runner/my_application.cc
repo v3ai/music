@@ -16,6 +16,19 @@ static void first_frame_cb(MyApplication* self, FlView* view) {
   gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
 }
 
+// The logo for the title bar, taskbar and alt-tab. It ships with the app as a
+// Flutter asset next to the executable (data/flutter_assets/assets/icon.png).
+static void set_window_icon(GtkWindow* window) {
+  g_autofree gchar* exe = g_file_read_link("/proc/self/exe", nullptr);
+  if (exe == nullptr) return;
+  g_autofree gchar* dir = g_path_get_dirname(exe);
+  g_autofree gchar* path = g_build_filename(dir, "data", "flutter_assets", "assets", "icon.png", nullptr);
+  g_autoptr(GError) error = nullptr;
+  if (!gtk_window_set_icon_from_file(window, path, &error)) {
+    g_warning("window icon: %s", error->message);
+  }
+}
+
 // Implements GApplication::activate.
 static void my_application_activate(GApplication* application) {
   MyApplication* self = MY_APPLICATION(application);
@@ -42,6 +55,7 @@ static void my_application_activate(GApplication* application) {
   // gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
 
   gtk_window_set_title(window, "music");
+  set_window_icon(window);
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();
   fl_dart_project_set_dart_entrypoint_arguments(
