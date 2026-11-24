@@ -15,6 +15,7 @@ import 'proxy.dart';
 import 'streams.dart';
 import 'tabs.dart';
 import 'ug.dart';
+import 'updater.dart';
 
 /// The app's services, created once at startup.
 class App {
@@ -27,6 +28,7 @@ class App {
   static late final AlbumArt art;
   static late final Tabs tabs;
   static late final UltimateGuitar ug;
+  static late final Updater updater;
   static late final Directory dataDir;
 
   static bool get isDesktop => Platform.isLinux || Platform.isWindows || Platform.isMacOS;
@@ -75,5 +77,7 @@ class App {
     await player.init(handler);
     downloads.start();
     integrateAppImage().ignore();
+    updater = Updater(Directory('${support.path}/updates'));
+    updater.start().ignore();
   }
 }

@@ -52,6 +52,14 @@ Root: HKCU; Subkey: "Software\Classes\v3ai-music\shell\open\command"; ValueType:
 
 [Run]
 Filename: "{app}\music.exe"; Description: "Open music"; Flags: nowait postinstall skipifsilent
+; after an automatic update (the app runs the installer silently with /relaunch=1)
+Filename: "{app}\music.exe"; Flags: nowait; Check: Relaunch
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}"
+
+[Code]
+function Relaunch: Boolean;
+begin
+  Result := ExpandConstant('{param:relaunch|0}') = '1';
+end;

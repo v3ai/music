@@ -4,6 +4,7 @@ import '../../core/app.dart';
 import '../../core/images.dart';
 import '../nav.dart';
 import '../theme.dart';
+import '../update_ui.dart';
 import '../widgets.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -61,6 +62,8 @@ class _SettingsPageState extends State<SettingsPage> {
               Nav.toast('Recent searches cleared');
             },
           ),
+          const _Header('Updates'),
+          const UpdateSettings(),
           const _Header('About'),
           const ListTile(
             title: Text('music', style: TextStyle(fontWeight: FontWeight.w600)),

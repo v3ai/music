@@ -4,6 +4,7 @@ import '../../core/app.dart';
 import '../../models.dart';
 import '../nav.dart';
 import '../theme.dart';
+import '../update_ui.dart';
 import '../widgets.dart';
 
 class HomePage extends StatefulWidget {
@@ -46,6 +47,7 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
         ),
+        SliverToBoxAdapter(child: UpdateBanner(pad: pad)),
         SliverToBoxAdapter(child: Watch(player: false, builder: (_) => _Quick(pad: pad))),
         FutureBuilder<List<Shelf>>(
           future: _feed,

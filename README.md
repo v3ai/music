@@ -46,6 +46,20 @@ flutter build macos         # macOS
 
 `source tool/env.sh` sets up `PATH` if Flutter and the Android SDK live in `~/development/flutter` and `~/Android/Sdk`.
 
+## Updates
+
+The app checks GitHub for a newer release at launch and every 6 hours (Settings → Updates can turn this off). It applies the update according to how it was installed ([`lib/core/updater.dart`](app/lib/core/updater.dart)):
+
+| Installed with | Update |
+|---|---|
+| Android APK | downloads the new APK on tap, then Android's install screen |
+| Windows installer | downloads in the background; Restart runs the installer silently and reopens the app |
+| macOS disk image | downloads in the background; Restart swaps the app in Applications ([`update-macos.sh`](app/assets/update-macos.sh)) |
+| AppImage | downloads next to the AppImage; Restart swaps the file |
+| apt | runs `apt-get` through the system password prompt (or just `sudo apt upgrade`) |
+
+After each release, CI runs the Windows and macOS update steps against the published files.
+
 ## Releasing
 
 Push a tag to build every platform on GitHub Actions and publish a release. The download page always points at the latest one.

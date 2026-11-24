@@ -161,3 +161,43 @@ jobs:
           code=$?
           cat app.log
           [ $code -eq 124 ] || { echo "AppImage exited early (code $code)"; exit 1; }
+
+  # The in-app updater on Windows and macOS, run against the files just published.
+  check-updaters:
+    if: github.ref_type == 'tag'
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix: { os: [windows-latest, macos-latest] }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Windows - silent update reopens the app
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Invoke-WebRequest "https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:GITHUB_REF_NAME/music-windows-setup.exe" -OutFile setup.exe
+          # exactly what the app runs (lib/core/updater.dart)
+          $p = Start-Process .\setup.exe -ArgumentList '/VERYSILENT','/SUPPRESSMSGBOXES','/NORESTART','/relaunch=1' -PassThru -Wait
+          if ($p.ExitCode -ne 0) { throw "installer exited with $($p.ExitCode)" }
+          $exe = "$env:LOCALAPPDATA\Programs\music\music.exe"
+          if (!(Test-Path $exe)) { throw "music.exe wasn't installed" }
+          Start-Sleep 15
+          $m = Get-Process music -ErrorAction SilentlyContinue
+          if (!$m) { throw "music didn't reopen after the update" }
+          "music is running from $exe"
+          $m | Stop-Process -Force
+      - name: macOS - swap script replaces the app and reopens it
+        if: runner.os == 'macOS'
+        run: |
+          curl -fsSL -o music.dmg "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/music-macos.dmg"
+          # stand-in for the old version, and for the old app's process that the script waits on
+          mkdir -p /Applications/music.app && touch /Applications/music.app/old-version
+          sleep 3 & old=$!
+          sh app/assets/update-macos.sh "$old" "$PWD/music.dmg" /Applications/music.app
+          [ ! -e /Applications/music.app/old-version ] || { echo "old app is still there"; exit 1; }
+          v=$(defaults read /Applications/music.app/Contents/Info.plist CFBundleShortVersionString)
+          echo "installed $v"
+          [ "$v" = "${GITHUB_REF_NAME#v}" ]
+          sleep 10
+          pgrep -x music || { echo "music didn't reopen after the update"; exit 1; }
